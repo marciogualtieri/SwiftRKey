@@ -1,0 +1,457 @@
+---
+title: "SwitftRKey: A typing predictor written in R"
+output:
+  html_document:
+    css: ./styles/style.css
+    df_print: kable
+    toc: yes
+    toc_depth: 4
+  md_document:
+    df_print: kable
+    toc: yes
+    toc_depth: 4
+    variant: markdown_github
+---
+
+## Installing Dependencies
+
+You will need to install some libraries before you install the required packages.
+
+### WordNet
+
+    sudo apt-get install wordnet
+
+```{r}
+Sys.setenv(WNHOME = "/usr/bin/wordnet")
+wordnet_path <- file.path("usr", "share", "dict")
+setDict(wordnet_path)
+```
+
+### LibV8
+
+    sudo apt-get install libv8-dev
+
+This library is required by the [pluralize" package](https://github.com/hrbrmstr/pluralize).
+
+## Installing the Required Packages
+
+You might need to install the following packages if you don't already have them:
+
+```{r, eval = FALSE}
+install.packages("dplyr")
+install.packages("R.utils")
+install.packages("tm")
+install.packages("wordcloud")
+install.packages("SnowballC")
+install.packages("ggplot2")
+install.packages("codetools")
+install.packages("RWeka")
+install.packages("textcat")
+install.packages("ff")
+install.packages("bigmemory", repos = "http://R-Forge.R-project.org")
+install.packages("qdap")
+install.packages("textcat")
+install.packages("data.table")
+install.packages("wordnet")
+install.packages("pacman")
+p_load_gh('hrbrmstr/pluralize')
+p_load(quanteda)
+```
+
+Just run the commands for the packages you need or run the whole chunk before you run the remaining ones in this notebook.
+
+## Importing the Required Packages
+
+Once the libraries are installed, they need to be loaded as follows:
+
+```{r}
+suppressMessages(library(dplyr))
+suppressMessages(library(R.utils))
+suppressMessages(library(tm))
+suppressMessages(library(wordcloud))
+suppressMessages(library(SnowballC))
+suppressMessages(library(ggplot2))
+suppressMessages(library(RWeka))
+suppressMessages(library(textcat))
+suppressMessages(library(ff))
+suppressMessages(library(bigmemory))
+suppressMessages(library(qdap))
+suppressMessages(library(textcat))
+suppressMessages(library(data.table))
+suppressMessages(library(wordnet))
+suppressMessages(library(pacman))
+```
+
+## Knitr Settings
+
+The raw data-set is pretty big, which might make rendering the output slow, so let's enable knitr's global caching:
+
+```{r}
+knitr::opts_chunk$set(cache = TRUE)
+```
+
+I'm also enabling verbose for easier debugging:
+
+```{r}
+knitr::opts_knit$set(verbose = TRUE)
+```
+
+## Memory Settings
+
+```{r}
+options(java.parameters = "-Xmx8192m")
+```
+
+## Setting a Seed
+
+To make sure this notebook is reproducible:
+
+```{r}
+set.seed(123)
+```
+
+## Data Processing
+
+### Downloading the Data-set
+
+```{r}
+download_zipped_data <- function(url, destination) {
+  temp_file <- tempfile()
+  download.file(url, temp_file)
+  unzip(zipfile = temp_file, exdir = destination)
+  unlink(temp_file)
+}
+
+download_zipped_data("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip",
+                     "./data")
+```
+
+### Data-set's Files
+
+```{r}
+list.files(path = "./data", recursive = TRUE)
+```
+
+There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages(german, english, finish and russian).
+
+```{r}
+file_head <- function(name, n = 3) {
+    connection <- file(name, open = "r")
+    result <- readLines(connection, n = n)
+    close(connection)
+    result
+}
+    
+
+file_head("./data/final/en_US/en_US.blogs.txt")
+```
+
+```{r}
+file_head("./data/final/en_US/en_US.news.txt")
+```
+
+
+```{r}
+file_head("./data/final/en_US/en_US.twitter.txt")
+```
+
+```{r}
+file_size <- function(name)
+    suppressWarnings(utils:::format.object_size(file.info(name)[["size"]], "auto"))
+
+file_lines <- function(name)
+    suppressWarnings(countLines(name))
+
+longest_line <- function(name)
+    suppressWarnings(max(sapply(readLines(name), nchar)))
+
+files_info <- function(dir) {
+    files <- list.files(dir, recursive = TRUE, full.names = TRUE)
+    data.frame(size = sapply(files, file_size),
+               lines = sapply(files, file_lines),
+               longest_line = sapply(files, longest_line))
+}
+
+files_info("./data/final/en_US")
+```
+
+### Sampling from the Input Files
+
+```{r}
+sample_file <- function(input_file, fraction) {
+    connection <- file(input_file, open = "r")
+    lines <- readLines(connection, skipNul = TRUE)
+    number_lines <- length(lines)
+    close(connection)
+    lines[rbinom(as.integer(number_lines * fraction), number_lines, 0.5)]
+}
+
+create_sample_file <- function(input_file, output_dir, fraction) {
+    sample <- sample_file(input_file, fraction)
+    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+    output_file <- paste0(output_dir, "/", basename(input_file))
+    writeLines(sample, output_file)
+}
+
+create_sample_files <- function(input_dir, output_dir, fraction) {
+     files <- list.files(input_dir, recursive = TRUE, full.names = TRUE)
+     invisible(sapply(files, create_sample_file, output_dir = output_dir, fraction = fraction))
+}
+
+create_sample_files("./data/final/en_US", "./data/samples", 0.0001)
+```
+
+### Text-Mining
+
+#### Create Corpus
+
+```{r}
+corpus <- VCorpus(DirSource("./data/samples"), readerControl = list(language = "en_US"))
+```
+
+#### Cleanup Corpus
+
+```{r}
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeWords, c(stopwords("en")))
+```
+
+#### Stemming
+
+```{r, eval = FALSE}
+corpus <- tm_map(corpus, stemDocument, language = "english")
+```
+
+#### Remove Curse Words
+
+The most legitimate source for curse words I could find is [this project on GitHub](https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words). This project maintains lists of curse words in several languages, including the ones we require for our data-sets.
+
+```{r}
+load_curse_words <- function(curse_words_url) {
+    connection <- url(curse_words_url)
+    lines <- readLines(connection)
+    close(connection)
+    stemDocument(lines)
+}
+
+curse_words <- load_curse_words(
+    "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en"
+    )
+
+corpus_without_curse_words <- tm_map(corpus, removeWords, curse_words)
+```
+
+#### Exploratory Data Analysis
+
+```{r}
+create_words_data_frame <- function(document_term_matrix) {
+  frequencies <- colSums(document_term_matrix)
+  words <- data.frame(word = names(frequencies), frequency = frequencies)
+  words <- arrange(words, desc(frequency))
+  rownames(words) <- 1:length(frequencies)
+  return(words)
+}
+
+one_to_four_ngrams <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 1, max = 4))
+
+document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
+                                           control = list(tokenize = one_to_four_ngrams))
+
+one_to_four_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+top_one_to_four_ngrams_words <- one_to_four_ngrams_words[1:50, ]
+top_one_to_four_ngrams_words
+```
+
+```{r, fig.height = 6, fig.width = 12}
+word_frequency_barchart <-function(words)
+    ggplot(words, aes(x = word, y = frequency)) +
+        geom_bar(stat="identity", fill = "burlywood1") +
+        scale_x_discrete(limits = words$word) +
+        ggtitle(paste("Top", nrow(words), "Word Frequencies in the Corpus")) +
+        ylab("Frequency") +
+        theme(axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5)) +
+        theme(plot.title = element_text(size = 18, face = "bold",
+                                        hjust = 0.5, margin = margin(b = 30, unit = "pt"))) +
+        theme(axis.title.x = element_blank()) +
+        theme(axis.title.y = element_text(size = 14, face="bold")) +
+        theme(panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+        theme(panel.border = element_rect(colour = "black", fill = NA, size = 0.5)) +
+        theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5)) +
+        theme(legend.title = element_blank())
+
+word_frequency_barchart(top_one_to_four_words)
+```
+
+
+```{r, fig.height = 6, fig.width = 12}
+words_cloud <- function(words)
+    wordcloud(words$word, words$frequency, scale = c(4, 0.5), colors = brewer.pal(8, "Dark2"))
+
+words_cloud(top_one_to_four_words)
+```
+
+```{r}
+two_only_ngrams <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 2, max = 2))
+
+document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
+                                           control = list(tokenize = two_only_ngrams))
+
+two_only_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+
+top_two_only_ngrams_words <- two_only_ngrams_words[1:50, ]
+top_two_only_ngrams_words
+```
+
+```{r, fig.height = 6, fig.width = 12}
+word_frequency_barchart(top_two_only_ngrams_words)
+```
+
+```{r, fig.height = 12, fig.width = 12}
+words_cloud(top_two_only_ngrams_words)
+```
+
+```{r}
+three_only_ngrams <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 3, max = 3))
+
+document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
+                                           control = list(tokenize = three_only_ngrams))
+
+three_only_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+
+top_three_only_ngrams_words <- three_only_ngrams_words[1:50, ]
+top_three_only_ngrams_words
+```
+
+```{r, fig.height = 6, fig.width = 12}
+word_frequency_barchart(top_three_only_ngrams_words)
+```
+
+```{r, fig.height = 16, fig.width = 16}
+words_cloud(top_three_only_ngrams_words)
+```
+
+```{r}
+words_coverage <- data.frame(
+    coverage = round(cumsum(one_to_four_ngrams_words$frequency) / sum(one_to_four_ngrams_words$frequency) * 100, 2),
+    words = 1:nrow(one_to_four_ngrams_words)
+    )
+
+words_coverage[1:6, ]
+```
+
+```{r, fig.height = 6, fig.width = 9}
+ggplot(words_coverage, aes(x = words, y = coverage)) +
+    geom_area(colour = "burlywood2", fill = "burlywood1", size = 1, alpha = 0.3) +
+    ggtitle("Word Coverage in the Data-set vs. Top Occurring N-Grams Added") +
+    xlab("Top Occuring N-Grams Added") +
+    ylab("Percentage of Coverage") +
+    theme(plot.title = element_text(size = 16, face = "bold",
+                                    hjust = 0.5, margin = margin(b = 30, unit = "pt"))) +
+    theme(axis.title.x = element_text(size = 12, face="bold")) +
+    theme(axis.title.y = element_text(size = 12, face="bold")) +
+    theme(panel.background = element_blank(), axis.line = element_line(colour = "black")) +
+    theme(panel.border = element_rect(colour = "black", fill = NA, size = 0.5)) +
+    theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5))
+```
+
+```{r}
+number_ngrams_for_50_percent_coverage <- min(words_coverage[words_coverage$coverage > 50, ]$words)
+number_ngrams_for_90_percent_coverage <- min(words_coverage[words_coverage$coverage > 90, ]$words)
+number_ngrams_for_50_percent_coverage
+number_ngrams_for_90_percent_coverage
+```
+
+According with the computation, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage and `r number_ngrams_for_90_percent_coverage` words to achieve 90%.
+
+```{r}
+tail(one_to_four_ngrams_words, 1000)
+```
+
+```{r}
+one_ngrams <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 1, max = 1))
+
+document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
+                                           control = list(tokenize = one_ngrams))
+
+one_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+one_ngrams_words_dt <- data.table(one_ngrams_words)
+```
+
+##### Language Detection Using TextCat
+
+The R package [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4) uses machine learning to detect several languages:
+
+```{r}
+names(TC_byte_profiles)
+```
+
+This package is quite flexible and allows detection using several different profiles. Here's another one:
+
+```{r}
+names(ECIMCI_profiles)
+```
+
+You may also exclude languages from a particular profile:
+
+```{r}
+languages <- c("english", "german", "finnish", "russian-iso8859_5",   "russian-koi8_r", "russian-windows1251")
+sub_tc_byte_profiles <- TC_byte_profiles[names(TC_byte_profiles) %in% languages]
+names(sub_tc_byte_profiles)
+```
+
+You may then use these profiles for detection:
+
+```{r}
+language_dt <- one_ngrams_words_dt[, language := textcat(word, p = sub_tc_byte_profiles)]
+language_aggregated_dt <- language_dt[, sum(frequency), by = language]
+names(language_aggregated_dt) <- c("language", "frequency")
+language_aggregated_dt <- language_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
+language_aggregated_dt
+```
+
+Looking at the classification for each word, it seems like textcat's accuracy leaves to desire:
+
+```{r}
+language_dt[1:10, ]
+```
+
+Thus, I decided to experiment with a different method, which follows in the next section.
+
+#### Language Detection Using WordNet
+
+The following function uses the wordnet package to determine if a word belongs to the english language:
+
+```{r}
+synonyms_found <- function(word, pos)
+    length(synonyms(word, pos)) > 0
+
+vectorized_synonyms <- function(words, pos)
+    sapply(words, synonyms_found, pos = pos)
+
+is_english <- function(input_word) {
+    test_adjective <- vectorized_synonyms(word = singularize(input_word), "ADJECTIVE")
+    test_adverb <- vectorized_synonyms(word = singularize(input_word), "ADVERB")
+    test_noun <- vectorized_synonyms(word = singularize(input_word), "NOUN")
+    test_verb <- vectorized_synonyms(word = singularize(input_word), "VERB")
+    test_adjective | test_adverb | test_noun | test_verb
+}
+
+is_english_dt <- one_ngrams_words_dt[, is_english := is_english(word)]
+is_english_aggregated_dt <- is_english_dt[, sum(frequency), by = is_english]
+names(language_dt) <- c("is_english", "frequency")
+is_english_aggregated_dt <- is_english_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
+is_english_aggregated_dt
+```
+
+These numbers seem more reasonable, as well as the classification for each word:
+
+```{r}
+is_english_dt[1:10, ]
+```

@@ -1,0 +1,29 @@
+table { display: block;
+        overflow-x: auto; 
+        max-height:400px;
+        overflow-y: auto;
+        border: 1px solid black !important;
+}
+
+th { border: 1px solid black !important;
+    background-color:#E1CDAF;
+    padding: 5px;
+}
+
+tr:nth-child(even) { background-color: #FFEBCD;
+}
+
+td { border: 1px solid black;
+     padding: 5px;
+}
+
+pre {
+    max-height:400px;
+    overflow-y:auto;
+    overflow-x:auto;
+}
+
+.leaflet {
+  height: 100%; 
+  width: 100%;
+}
