@@ -1,33 +1,32 @@
 ---
-title: "SwitftRKey: A typing predictor written in R"
+title: "SwitftRKey: A keyboard typing prediction app written in R"
+author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
   html_document:
     css: ./styles/style.css
     df_print: kable
     toc: yes
-    toc_depth: 4
+    toc_depth: 6
   md_document:
     df_print: kable
     toc: yes
-    toc_depth: 4
+    toc_depth: 6
     variant: markdown_github
 ---
 
 ## Installing Dependencies
 
-You will need to install some libraries before you install the required packages.
+You will need to install some libraries in your operating system before you install the required packages.
 
 ### WordNet
 
+Follow the instructions for Linux:
+
     sudo apt-get install wordnet
 
-```{r}
-Sys.setenv(WNHOME = "/usr/bin/wordnet")
-wordnet_path <- file.path("usr", "share", "dict")
-setDict(wordnet_path)
-```
-
 ### LibV8
+
+Follow the instructions for Linux:
 
     sudo apt-get install libv8-dev
 
@@ -54,8 +53,6 @@ install.packages("textcat")
 install.packages("data.table")
 install.packages("wordnet")
 install.packages("pacman")
-p_load_gh('hrbrmstr/pluralize')
-p_load(quanteda)
 ```
 
 Just run the commands for the packages you need or run the whole chunk before you run the remaining ones in this notebook.
@@ -80,6 +77,16 @@ suppressMessages(library(textcat))
 suppressMessages(library(data.table))
 suppressMessages(library(wordnet))
 suppressMessages(library(pacman))
+p_load_gh('hrbrmstr/pluralize')
+p_load(quanteda)
+```
+
+Wordnet also requires the following setup:
+
+```{r}
+Sys.setenv(WNHOME = "/usr/bin/wordnet")
+wordnet_path <- file.path("usr", "share", "dict")
+setDict(wordnet_path)
 ```
 
 ## Knitr Settings
@@ -96,12 +103,6 @@ I'm also enabling verbose for easier debugging:
 knitr::opts_knit$set(verbose = TRUE)
 ```
 
-## Memory Settings
-
-```{r}
-options(java.parameters = "-Xmx8192m")
-```
-
 ## Setting a Seed
 
 To make sure this notebook is reproducible:
@@ -109,6 +110,12 @@ To make sure this notebook is reproducible:
 ```{r}
 set.seed(123)
 ```
+
+## Synopsis
+
+The objective of this notebook is basically data cleaning and exploratory data analysis. Before we can build a predictive model for keyboard typing (i.e., what is the next word given the current typed words), we are going to use some of R's text-mining tools to find basic patterns in English text data, i.e., the distribution of words and relationships between them in sentences presents in the raw data-set.
+
+Our work-horse is going to be the [tm](http://tm.r-forge.r-project.org/) package, but we are also going to need other auxiliary packages to get the job done (such as [RWeka](https://www.rdocumentation.org/packages/RWeka/versions/0.4-34), [wordcloud](https://www.rdocumentation.org/packages/wordcloud/versions/2.5), [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4) and [qdap](https://github.com/trinker/qdap) to cite a few).
 
 ## Data Processing
 
@@ -132,7 +139,9 @@ download_zipped_data("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/
 list.files(path = "./data", recursive = TRUE)
 ```
 
-There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages(german, english, finish and russian).
+There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages(German, English, finnish and Russian).
+
+Here's a sample from "blogs":
 
 ```{r}
 file_head <- function(name, n = 3) {
@@ -141,19 +150,23 @@ file_head <- function(name, n = 3) {
     close(connection)
     result
 }
-    
 
 file_head("./data/final/en_US/en_US.blogs.txt")
 ```
+
+A sample from "news":
 
 ```{r}
 file_head("./data/final/en_US/en_US.news.txt")
 ```
 
+A sample from "twitter":
 
 ```{r}
 file_head("./data/final/en_US/en_US.twitter.txt")
 ```
+
+Helps to get some basic metadata on the files we are working with:
 
 ```{r}
 file_size <- function(name)
@@ -176,6 +189,8 @@ files_info("./data/final/en_US")
 ```
 
 ### Sampling from the Input Files
+
+As we have found out in the previous section, the files are huge, thus we are going to work with a sub-set from the available data. The following code is going to take random samples from the available text files:
 
 ```{r}
 sample_file <- function(input_file, fraction) {
@@ -201,9 +216,13 @@ create_sample_files <- function(input_dir, output_dir, fraction) {
 create_sample_files("./data/final/en_US", "./data/samples", 0.0001)
 ```
 
+We are going to take 0.01% of the sentences inside each file in the directory. I have verified by trial and error that this amount is sufficient to see the patterns we need to see.
+
 ### Text-Mining
 
 #### Create Corpus
+
+The first step is creating a corpus of text from the raw data:
 
 ```{r}
 corpus <- VCorpus(DirSource("./data/samples"), readerControl = list(language = "en_US"))
@@ -211,15 +230,19 @@ corpus <- VCorpus(DirSource("./data/samples"), readerControl = list(language = "
 
 #### Cleanup Corpus
 
+We are required to remove some unwanted symbols from the text now (white space, punctuation, numbers, etc). We are also going to transform every words to lowercase and remove stop words:
+
 ```{r}
 corpus <- tm_map(corpus, stripWhitespace)
 corpus <- tm_map(corpus, removePunctuation)
 corpus <- tm_map(corpus, removeNumbers)
 corpus <- tm_map(corpus, content_transformer(tolower))
-corpus <- tm_map(corpus, removeWords, c(stopwords("en")))
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
 ```
 
 #### Stemming
+
+I'm not so sure at this moment that I should be doing stemming. I'm leaving the command here for now for future reference (evaluation for this chunk is turned off).
 
 ```{r, eval = FALSE}
 corpus <- tm_map(corpus, stemDocument, language = "english")
@@ -244,7 +267,9 @@ curse_words <- load_curse_words(
 corpus_without_curse_words <- tm_map(corpus, removeWords, curse_words)
 ```
 
-#### Exploratory Data Analysis
+## Exploratory Data Analysis
+
+### Distribution of N-Grams of Size from One to Four Words
 
 ```{r}
 create_words_data_frame <- function(document_term_matrix) {
@@ -266,6 +291,8 @@ top_one_to_four_ngrams_words <- one_to_four_ngrams_words[1:50, ]
 top_one_to_four_ngrams_words
 ```
 
+Here's a bar chart for the top words in the distribution:
+
 ```{r, fig.height = 6, fig.width = 12}
 word_frequency_barchart <-function(words)
     ggplot(words, aes(x = word, y = frequency)) +
@@ -283,16 +310,19 @@ word_frequency_barchart <-function(words)
         theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5)) +
         theme(legend.title = element_blank())
 
-word_frequency_barchart(top_one_to_four_words)
+word_frequency_barchart(top_one_to_four_ngrams_words)
 ```
 
+A word cloud is also a good visualization tool for n-gram frequency:
 
-```{r, fig.height = 6, fig.width = 12}
+```{r, fig.height = 6, fig.width = 6}
 words_cloud <- function(words)
     wordcloud(words$word, words$frequency, scale = c(4, 0.5), colors = brewer.pal(8, "Dark2"))
 
-words_cloud(top_one_to_four_words)
+words_cloud(top_one_to_four_ngrams_words)
 ```
+
+### Distribution of N-Grams of Size Two Words
 
 ```{r}
 two_only_ngrams <- function(x) 
@@ -307,13 +337,19 @@ top_two_only_ngrams_words <- two_only_ngrams_words[1:50, ]
 top_two_only_ngrams_words
 ```
 
+Its bar chart:
+
 ```{r, fig.height = 6, fig.width = 12}
 word_frequency_barchart(top_two_only_ngrams_words)
 ```
 
-```{r, fig.height = 12, fig.width = 12}
+Its word cloud:
+
+```{r, fig.height = 9, fig.width = 9}
 words_cloud(top_two_only_ngrams_words)
 ```
+
+### Distribution of N-Grams of Size Three Words
 
 ```{r}
 three_only_ngrams <- function(x) 
@@ -328,13 +364,23 @@ top_three_only_ngrams_words <- three_only_ngrams_words[1:50, ]
 top_three_only_ngrams_words
 ```
 
+Its bar chart:
+
 ```{r, fig.height = 6, fig.width = 12}
 word_frequency_barchart(top_three_only_ngrams_words)
 ```
 
-```{r, fig.height = 16, fig.width = 16}
+Its word cloud:
+
+```{r, fig.height = 9, fig.width = 9}
 words_cloud(top_three_only_ngrams_words)
 ```
+
+### Word Coverage
+
+How Many of the top words are required to cover a given percentage of words present in the entire data-set?
+
+We are going to answer this question by finding out how the number of words covered in the data-set increases as we add words from the most frequent to the least frequent:
 
 ```{r}
 words_coverage <- data.frame(
@@ -345,7 +391,9 @@ words_coverage <- data.frame(
 words_coverage[1:6, ]
 ```
 
-```{r, fig.height = 6, fig.width = 9}
+Let's plot the coverage function as a line plot:
+
+```{r, fig.height = 6, fig.width = 12}
 ggplot(words_coverage, aes(x = words, y = coverage)) +
     geom_area(colour = "burlywood2", fill = "burlywood1", size = 1, alpha = 0.3) +
     ggtitle("Word Coverage in the Data-set vs. Top Occurring N-Grams Added") +
@@ -360,18 +408,27 @@ ggplot(words_coverage, aes(x = words, y = coverage)) +
     theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5))
 ```
 
+This function that we have obtained experimentally from the data is named [Zipf CDF](https://en.wikipedia.org/wiki/Zipf%27s_law) (Cumulative Distribution Function). It is a well known fact that the distribution of words in natural languages follows the distribution described by this function.
+
+Now we need to know what's the minimum number of top words added to achieve 50% and 90% coverage:
+
 ```{r}
 number_ngrams_for_50_percent_coverage <- min(words_coverage[words_coverage$coverage > 50, ]$words)
-number_ngrams_for_90_percent_coverage <- min(words_coverage[words_coverage$coverage > 90, ]$words)
 number_ngrams_for_50_percent_coverage
+```
+
+```{r}
+number_ngrams_for_90_percent_coverage <- min(words_coverage[words_coverage$coverage > 90, ]$words)
 number_ngrams_for_90_percent_coverage
 ```
 
-According with the computation, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage and `r number_ngrams_for_90_percent_coverage` words to achieve 90%.
+According with the computation, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage (that is, that's the minimum number of top words added that would represent half of the words present in the data) and `r number_ngrams_for_90_percent_coverage` words to achieve 90%.
 
-```{r}
-tail(one_to_four_ngrams_words, 1000)
-```
+### Language Detection
+
+#### Language Detection Using TextCat
+
+How about estimating the number of words in the data that are actually written in the English language:
 
 ```{r}
 one_ngrams <- function(x) 
@@ -384,7 +441,7 @@ one_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
 one_ngrams_words_dt <- data.table(one_ngrams_words)
 ```
 
-##### Language Detection Using TextCat
+I'm using data tables due to performance. Much faster than using `sapply()` on data frames.
 
 The R package [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4) uses machine learning to detect several languages:
 
@@ -413,7 +470,7 @@ language_dt <- one_ngrams_words_dt[, language := textcat(word, p = sub_tc_byte_p
 language_aggregated_dt <- language_dt[, sum(frequency), by = language]
 names(language_aggregated_dt) <- c("language", "frequency")
 language_aggregated_dt <- language_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
-language_aggregated_dt
+as.data.frame(language_aggregated_dt)
 ```
 
 Looking at the classification for each word, it seems like textcat's accuracy leaves to desire:
@@ -426,7 +483,7 @@ Thus, I decided to experiment with a different method, which follows in the next
 
 #### Language Detection Using WordNet
 
-The following function uses the wordnet package to determine if a word belongs to the english language:
+The following function uses the wordnet package to determine if a word belongs to the English language:
 
 ```{r}
 synonyms_found <- function(word, pos)
@@ -445,9 +502,9 @@ is_english <- function(input_word) {
 
 is_english_dt <- one_ngrams_words_dt[, is_english := is_english(word)]
 is_english_aggregated_dt <- is_english_dt[, sum(frequency), by = is_english]
-names(language_dt) <- c("is_english", "frequency")
+names(is_english_aggregated_dt) <- c("is_english", "frequency")
 is_english_aggregated_dt <- is_english_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
-is_english_aggregated_dt
+as.data.frame(is_english_aggregated_dt)
 ```
 
 These numbers seem more reasonable, as well as the classification for each word:
@@ -455,3 +512,15 @@ These numbers seem more reasonable, as well as the classification for each word:
 ```{r}
 is_english_dt[1:10, ]
 ```
+
+## Results
+
+We have confirmed that the distribution of words follow some known theoretical properties by analyzing a randomly sampled sub-set of the available data. We are going to exploit such properties to build a prediction model for keyboard typing.
+
+Regarding coverage, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage and `r number_ngrams_for_90_percent_coverage` words to achieve 90%. Coverage follows a Zipf CDF, a known probability distribution function.
+
+We could increase coverage by choosing words more aligned with the vocabulary of the specific user for which we want to do keyboard typing prediction. We could do that by the following means:
+
+- Improving the data corpus by using text collected from each individual user (essentially each user would start with a standard corpus of text, which would improve as the user types new sentences). Each user would have its own particular corpus of text (or its own model, which would be updated over time). That could raise privacy concerns though, as we would be required to store at least bits of conversations and web browsing behavior. That wouldn't be critical for public services such as blogs and twitter, but could be potentially a problem for news (we would need to keep track of articles the user has clicked on).
+
+- Creating groups of users into different profiles (casual, business, scientific, etc) and respective models. An option would be to give the user the option of choosing an specific profile on the fly according with their current needs or commit to a single one when they sign-up for the service.
