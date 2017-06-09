@@ -1,5 +1,5 @@
 ---
-title: "SwitftRKey: A keyboard typing prediction app written in R"
+title: "SwitftRKey: A typing prediction app written in R"
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
   html_document:
@@ -113,7 +113,7 @@ set.seed(123)
 
 ## Synopsis
 
-The objective of this notebook is basically data cleaning and exploratory data analysis. Before we can build a predictive model for keyboard typing (i.e., what is the next word given the current typed words), we are going to use some of R's text-mining tools to find basic patterns in English text data, i.e., the distribution of words and relationships between them in sentences presents in the raw data-set.
+The objective of this notebook is basically data cleaning and exploratory data analysis. Before we can build a predictive model for keyboard typing, i.e., what is the next word given the current typed words, we are going to use some of R's text-mining tools to find basic patterns in English text data, i.e., the distribution of words and relationships between them in sentences present in the raw data-set.
 
 Our work-horse is going to be the [tm](http://tm.r-forge.r-project.org/) package, but we are also going to need other auxiliary packages to get the job done (such as [RWeka](https://www.rdocumentation.org/packages/RWeka/versions/0.4-34), [wordcloud](https://www.rdocumentation.org/packages/wordcloud/versions/2.5), [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4) and [qdap](https://github.com/trinker/qdap) to cite a few).
 
@@ -524,3 +524,4 @@ We could increase coverage by choosing words more aligned with the vocabulary of
 - Improving the data corpus by using text collected from each individual user (essentially each user would start with a standard corpus of text, which would improve as the user types new sentences). Each user would have its own particular corpus of text (or its own model, which would be updated over time). That could raise privacy concerns though, as we would be required to store at least bits of conversations and web browsing behavior. That wouldn't be critical for public services such as blogs and twitter, but could be potentially a problem for news (we would need to keep track of articles the user has clicked on).
 
 - Creating groups of users into different profiles (casual, business, scientific, etc) and respective models. An option would be to give the user the option of choosing an specific profile on the fly according with their current needs or commit to a single one when they sign-up for the service.
+
