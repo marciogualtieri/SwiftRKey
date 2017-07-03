@@ -53,6 +53,9 @@ install.packages("textcat")
 install.packages("data.table")
 install.packages("wordnet")
 install.packages("pacman")
+install.packages("markovchain")
+install.packages("edgeR")
+install.packages("R.cache")
 ```
 
 Just run the commands for the packages you need or run the whole chunk before you run the remaining ones in this notebook.
@@ -63,6 +66,7 @@ Once the libraries are installed, they need to be loaded as follows:
 
 ```{r}
 suppressMessages(library(dplyr))
+suppressMessages(library(plyr))
 suppressMessages(library(R.utils))
 suppressMessages(library(tm))
 suppressMessages(library(wordcloud))
@@ -79,6 +83,9 @@ suppressMessages(library(wordnet))
 suppressMessages(library(pacman))
 p_load_gh('hrbrmstr/pluralize')
 p_load(quanteda)
+suppressMessages(library(markovchain))
+suppressMessages(library(edgeR))
+suppressMessages(library(R.cache))
 ```
 
 Wordnet also requires the following setup:
@@ -113,9 +120,18 @@ set.seed(123)
 
 ## Synopsis
 
-The objective of this notebook is basically data cleaning and exploratory data analysis. Before we can build a predictive model for keyboard typing, i.e., what is the next word given the current typed words, we are going to use some of R's text-mining tools to find basic patterns in English text data, i.e., the distribution of words and relationships between them in sentences present in the raw data-set.
+The objectives of this notebook are basic data cleaning, exploratory data analysis and model design for a keyboard typing predicting app, (i.e., capable of predicting what's the next word given the currently typed words).
 
-Our work-horse is going to be the [tm](http://tm.r-forge.r-project.org/) package, but we are also going to need other auxiliary packages to get the job done (such as [RWeka](https://www.rdocumentation.org/packages/RWeka/versions/0.4-34), [wordcloud](https://www.rdocumentation.org/packages/wordcloud/versions/2.5), [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4) and [qdap](https://github.com/trinker/qdap) to cite a few).
+We are going to start by using some of R's text-mining packages to find some basic patterns in a corpus of English text, e.g., what's the distribution of words, what are the relationships between words in sentences, etc.
+
+Our work-horse is going to be the [tm](http://tm.r-forge.r-project.org/) package, but we are also relying on some other auxiliary packages to get the job done, such as:
+
+- [RWeka](https://www.rdocumentation.org/packages/RWeka/versions/0.4-34)
+- [wordcloud](https://www.rdocumentation.org/packages/wordcloud/versions/2.5)
+- [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4)
+- [qdap](https://github.com/trinker/qdap)
+
+The next step is going to be the creation of a R script to produce and save to disk an improved model of the same design (spoiler: the model consists of a transition matrix which represents a [Markov process](https://en.wikipedia.org/wiki/Markov_chain)). The model produced in this notebook is only a proof of concept to verify design choices. In a bare bones R script (without exploratory data analysis code) we can better utilize the available resources (memory and CPU) and work with a larger corpus of text to improve our probability estimates.
 
 ## Data Processing
 
@@ -139,7 +155,7 @@ download_zipped_data("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/
 list.files(path = "./data", recursive = TRUE)
 ```
 
-There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages(German, English, finnish and Russian).
+There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages (German, English, finnish and Russian).
 
 Here's a sample from "blogs":
 
@@ -188,35 +204,47 @@ files_info <- function(dir) {
 files_info("./data/final/en_US")
 ```
 
+For purposes of exploratory data analysis and modeling, we are going to use only the English corpus.
+
 ### Sampling from the Input Files
 
 As we have found out in the previous section, the files are huge, thus we are going to work with a sub-set from the available data. The following code is going to take random samples from the available text files:
 
 ```{r}
-sample_file <- function(input_file, fraction) {
+sample_file <- function(input_file, sample_fraction, test_fraction) {
     connection <- file(input_file, open = "r")
     lines <- readLines(connection, skipNul = TRUE)
     number_lines <- length(lines)
     close(connection)
-    lines[rbinom(as.integer(number_lines * fraction), number_lines, 0.5)]
+    sample_indexes <- sample(1:number_lines, as.integer(number_lines * sample_fraction), replace = FALSE)
+    partitioning_index <- as.integer(length(sample_indexes) * (1 - test_fraction))
+    list(
+        lines[sample_indexes[1:partitioning_index]],
+        lines[sample_indexes[(partitioning_index + 1):length(sample_indexes)]]
+    )
 }
 
-create_sample_file <- function(input_file, output_dir, fraction) {
-    sample <- sample_file(input_file, fraction)
-    dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
-    output_file <- paste0(output_dir, "/", basename(input_file))
-    writeLines(sample, output_file)
+create_sample_file <- function(input_file, output_dir, sample_fraction, test_fraction) {
+    sample <- sample_file(input_file, sample_fraction, test_fraction)
+    train_sample <- sample[[1]]
+    test_sample <- sample[[2]]
+    dir.create(paste0(output_dir, "/training"), recursive = TRUE, showWarnings = FALSE)
+    dir.create(paste0(output_dir, "/testing"), recursive = TRUE, showWarnings = FALSE)
+    writeLines(train_sample, paste0(output_dir, "/training/", basename(input_file)))
+    writeLines(test_sample, paste0(output_dir, "/testing/", basename(input_file)))
 }
 
-create_sample_files <- function(input_dir, output_dir, fraction) {
+create_sample_files <- function(input_dir, output_dir, sample_fraction, test_fraction) {
      files <- list.files(input_dir, recursive = TRUE, full.names = TRUE)
-     invisible(sapply(files, create_sample_file, output_dir = output_dir, fraction = fraction))
+     invisible(sapply(files, create_sample_file, output_dir = output_dir,
+                      sample_fraction = sample_fraction,
+                      test_fraction = test_fraction))
 }
 
-create_sample_files("./data/final/en_US", "./data/samples", 0.0001)
+create_sample_files("./data/final/en_US", "./data/samples", 0.005, 0.3)
 ```
 
-We are going to take 0.01% of the sentences inside each file in the directory. I have verified by trial and error that this amount is sufficient to see the patterns we need to see.
+We are going to take 0.1% of the sentences inside each file in the directory. I have verified by trial and error that this amount is sufficient to see the patterns we need to see.
 
 ### Text-Mining
 
@@ -225,7 +253,7 @@ We are going to take 0.01% of the sentences inside each file in the directory. I
 The first step is creating a corpus of text from the raw data:
 
 ```{r}
-corpus <- VCorpus(DirSource("./data/samples"), readerControl = list(language = "en_US"))
+corpus <- VCorpus(DirSource("./data/samples/training"), readerControl = list(language = "en_US"))
 ```
 
 #### Cleanup Corpus
@@ -233,12 +261,23 @@ corpus <- VCorpus(DirSource("./data/samples"), readerControl = list(language = "
 We are required to remove some unwanted symbols from the text now (white space, punctuation, numbers, etc). We are also going to transform every words to lowercase and remove stop words:
 
 ```{r}
-corpus <- tm_map(corpus, stripWhitespace)
-corpus <- tm_map(corpus, removePunctuation)
-corpus <- tm_map(corpus, removeNumbers)
-corpus <- tm_map(corpus, content_transformer(tolower))
-corpus <- tm_map(corpus, removeWords, stopwords("english"))
+replacePunctuation <- content_transformer(function(x) gsub("[^[:alnum:][:space:]'`]", " ", x))
+
+clean_corpus <- function(corpus) {
+    corpus <- tm_map(corpus, stripWhitespace)
+    corpus <- tm_map(corpus, replacePunctuation)
+    corpus <- tm_map(corpus, removeNumbers)
+    corpus <- tm_map(corpus, content_transformer(tolower))
+    corpus <- tm_map(corpus, removeWords, stopwords("english"))
+    corpus
+}
+
+corpus <- clean_corpus(corpus)
 ```
+
+I'm not using tm's default `removePunctuation()` though, because it would remove apostrophes, e.g., "we're" would become "were".
+
+Contractions are not single words: e.g., "we're" and "doesn't" are actually "we are" and "does not". Thus, apostrophes should be considered delimiter characters (like whitespaces).
 
 #### Stemming
 
@@ -272,33 +311,34 @@ corpus_without_curse_words <- tm_map(corpus, removeWords, curse_words)
 ### Distribution of N-Grams of Size from One to Four Words
 
 ```{r}
-create_words_data_frame <- function(document_term_matrix) {
+create_ngrams_data_frame <- function(document_term_matrix) {
   frequencies <- colSums(document_term_matrix)
-  words <- data.frame(word = names(frequencies), frequency = frequencies)
-  words <- arrange(words, desc(frequency))
-  rownames(words) <- 1:length(frequencies)
-  return(words)
+  ngrams <- data.frame(ngram = names(frequencies), frequency = frequencies, stringsAsFactors = FALSE)
+  ngrams <- arrange(ngrams, desc(frequency))
+  rownames(ngrams) <- 1:length(frequencies)
+  return(ngrams)
 }
 
-one_to_four_ngrams <- function(x) 
-  NGramTokenizer(x, Weka_control(min = 1, max = 4))
+one_gram_tokenizer <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 1, max = 1))
 
 document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
-                                           control = list(tokenize = one_to_four_ngrams))
+                                           control = list(tokenize = one_gram_tokenizer,
+                                                          wordLengths=c(1, Inf)))
 
-one_to_four_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
-top_one_to_four_ngrams_words <- one_to_four_ngrams_words[1:50, ]
-top_one_to_four_ngrams_words
+one_grams <- create_ngrams_data_frame(as.matrix(document_term_matrix))
+top_one_grams <- one_grams[1:50, ]
+top_one_grams
 ```
 
 Here's a bar chart for the top words in the distribution:
 
 ```{r, fig.height = 6, fig.width = 12}
-word_frequency_barchart <-function(words)
-    ggplot(words, aes(x = word, y = frequency)) +
+ngram_frequency_barchart <-function(ngrams)
+    ggplot(ngrams, aes(x = ngram, y = frequency)) +
         geom_bar(stat="identity", fill = "burlywood1") +
-        scale_x_discrete(limits = words$word) +
-        ggtitle(paste("Top", nrow(words), "Word Frequencies in the Corpus")) +
+        scale_x_discrete(limits = ngrams$ngram) +
+        ggtitle(paste("Top", nrow(ngrams), "Word Frequencies in the Corpus")) +
         ylab("Frequency") +
         theme(axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5)) +
         theme(plot.title = element_text(size = 18, face = "bold",
@@ -310,70 +350,86 @@ word_frequency_barchart <-function(words)
         theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5)) +
         theme(legend.title = element_blank())
 
-word_frequency_barchart(top_one_to_four_ngrams_words)
+ngram_frequency_barchart(top_one_grams)
 ```
 
 A word cloud is also a good visualization tool for n-gram frequency:
 
 ```{r, fig.height = 6, fig.width = 6}
-words_cloud <- function(words)
-    wordcloud(words$word, words$frequency, scale = c(4, 0.5), colors = brewer.pal(8, "Dark2"))
+words_cloud <- function(ngrams)
+    wordcloud(ngrams$ngram, ngrams$frequency, scale = c(4, 0.5), colors = brewer.pal(8, "Dark2"))
 
-words_cloud(top_one_to_four_ngrams_words)
+words_cloud(top_one_grams)
 ```
 
 ### Distribution of N-Grams of Size Two Words
 
 ```{r}
-two_only_ngrams <- function(x) 
+two_ngram_tokenizer <- function(x) 
   NGramTokenizer(x, Weka_control(min = 2, max = 2))
 
 document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
-                                           control = list(tokenize = two_only_ngrams))
+                                           control = list(tokenize = two_ngram_tokenizer,
+                                                          wordLengths=c(1, Inf)))
 
-two_only_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+two_ngrams <- create_ngrams_data_frame(as.matrix(document_term_matrix))
 
-top_two_only_ngrams_words <- two_only_ngrams_words[1:50, ]
-top_two_only_ngrams_words
+top_two_ngrams <- two_ngrams[1:50, ]
+top_two_ngrams
 ```
 
 Its bar chart:
 
 ```{r, fig.height = 6, fig.width = 12}
-word_frequency_barchart(top_two_only_ngrams_words)
+ngram_frequency_barchart(top_two_ngrams)
 ```
 
 Its word cloud:
 
 ```{r, fig.height = 9, fig.width = 9}
-words_cloud(top_two_only_ngrams_words)
+words_cloud(top_two_ngrams)
 ```
 
 ### Distribution of N-Grams of Size Three Words
 
 ```{r}
-three_only_ngrams <- function(x) 
+three_ngram_tokenizer <- function(x) 
   NGramTokenizer(x, Weka_control(min = 3, max = 3))
 
 document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
-                                           control = list(tokenize = three_only_ngrams))
+                                           control = list(tokenize = three_ngram_tokenizer,
+                                                          wordLengths=c(1, Inf)))
 
-three_only_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
+three_ngrams <- create_ngrams_data_frame(as.matrix(document_term_matrix))
 
-top_three_only_ngrams_words <- three_only_ngrams_words[1:50, ]
-top_three_only_ngrams_words
+top_three_ngrams <- three_ngrams[1:50, ]
+top_three_ngrams
 ```
 
 Its bar chart:
 
 ```{r, fig.height = 6, fig.width = 12}
-word_frequency_barchart(top_three_only_ngrams_words)
+ngram_frequency_barchart(top_three_ngrams)
 ```
 
 Its word cloud:
 
-```{r, fig.height = 9, fig.width = 9}
-words_cloud(top_three_only_ngrams_words)
+```{r, fig.height = 16, fig.width = 16}
+words_cloud(top_three_ngrams)
+```
+
+You are going to need N-Grams with size 4 as well for the model, but I'm not going to plot their frequencies:
+
+```{r}
+four_gram_tokenizer <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 4, max = 4))
+
+document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
+                                           control = list(tokenize = four_gram_tokenizer,
+                                                          wordLengths=c(1, Inf)))
+
+four_ngrams <- create_ngrams_data_frame(as.matrix(document_term_matrix))
+four_ngrams[1: 50, ]
 ```
 
 ### Word Coverage
@@ -384,8 +440,8 @@ We are going to answer this question by finding out how the number of words cove
 
 ```{r}
 words_coverage <- data.frame(
-    coverage = round(cumsum(one_to_four_ngrams_words$frequency) / sum(one_to_four_ngrams_words$frequency) * 100, 2),
-    words = 1:nrow(one_to_four_ngrams_words)
+    coverage = round(cumsum(one_grams$frequency) / sum(one_grams$frequency) * 100, 2),
+    words = 1:nrow(one_grams)
     )
 
 words_coverage[1:6, ]
@@ -408,7 +464,7 @@ ggplot(words_coverage, aes(x = words, y = coverage)) +
     theme(strip.background = element_rect(fill = alpha("burlywood3", 0.3), color = "black", size = 0.5))
 ```
 
-This function that we have obtained experimentally from the data is named [Zipf CDF](https://en.wikipedia.org/wiki/Zipf%27s_law) (Cumulative Distribution Function). It is a well known fact that the distribution of words in natural languages follows the distribution described by this function.
+This function plot that we have obtained experimentally from data is named [Zipf CDF](https://en.wikipedia.org/wiki/Zipf%27s_law) (Cumulative Distribution Function). It is a well known fact that the distribution of words in natural languages follows the distribution described by this function.
 
 Now we need to know what's the minimum number of top words added to achieve 50% and 90% coverage:
 
@@ -422,7 +478,11 @@ number_ngrams_for_90_percent_coverage <- min(words_coverage[words_coverage$cover
 number_ngrams_for_90_percent_coverage
 ```
 
-According with the computation, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage (that is, that's the minimum number of top words added that would represent half of the words present in the data) and `r number_ngrams_for_90_percent_coverage` words to achieve 90%.
+```{r}
+tail(words_coverage, n = 1)[, 2]
+```
+
+According with these computations, we would need `r number_ngrams_for_50_percent_coverage` words to achieve 50% coverage (that is, that's the minimum number of top words added that would represent half of the words present in the data) and `r number_ngrams_for_90_percent_coverage` words to achieve 90%.
 
 ### Language Detection
 
@@ -431,14 +491,7 @@ According with the computation, we would need `r number_ngrams_for_50_percent_co
 How about estimating the number of words in the data that are actually written in the English language:
 
 ```{r}
-one_ngrams <- function(x) 
-  NGramTokenizer(x, Weka_control(min = 1, max = 1))
-
-document_term_matrix <- DocumentTermMatrix(corpus_without_curse_words,
-                                           control = list(tokenize = one_ngrams))
-
-one_ngrams_words <- create_words_data_frame(as.matrix(document_term_matrix))
-one_ngrams_words_dt <- data.table(one_ngrams_words)
+one_ngrams_dt <- data.table(one_grams)
 ```
 
 I'm using data tables due to performance. Much faster than using `sapply()` on data frames.
@@ -466,14 +519,14 @@ names(sub_tc_byte_profiles)
 You may then use these profiles for detection:
 
 ```{r}
-language_dt <- one_ngrams_words_dt[, language := textcat(word, p = sub_tc_byte_profiles)]
+language_dt <- one_ngrams_dt[, language := textcat(ngram, p = sub_tc_byte_profiles)]
 language_aggregated_dt <- language_dt[, sum(frequency), by = language]
 names(language_aggregated_dt) <- c("language", "frequency")
 language_aggregated_dt <- language_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
 as.data.frame(language_aggregated_dt)
 ```
 
-Looking at the classification for each word, it seems like textcat's accuracy leaves to desire:
+Looking at the classification for each word, it seems like textcat's accuracy leaves to desire quite a bit:
 
 ```{r}
 language_dt[1:10, ]
@@ -485,7 +538,7 @@ Thus, I decided to experiment with a different method, which follows in the next
 
 The following function uses the wordnet package to determine if a word belongs to the English language:
 
-```{r}
+```{r, eval = FALSE}
 synonyms_found <- function(word, pos)
     length(synonyms(word, pos)) > 0
 
@@ -500,7 +553,7 @@ is_english <- function(input_word) {
     test_adjective | test_adverb | test_noun | test_verb
 }
 
-is_english_dt <- one_ngrams_words_dt[, is_english := is_english(word)]
+is_english_dt <- one_ngrams_dt[, is_english := is_english(ngram)]
 is_english_aggregated_dt <- is_english_dt[, sum(frequency), by = is_english]
 names(is_english_aggregated_dt) <- c("is_english", "frequency")
 is_english_aggregated_dt <- is_english_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
@@ -509,11 +562,618 @@ as.data.frame(is_english_aggregated_dt)
 
 These numbers seem more reasonable, as well as the classification for each word:
 
-```{r}
-is_english_dt[1:10, ]
+```{r, eval = FALSE}
+is_english_dt[1:12, ]
 ```
 
+## Prediction Model
+
+### Unknown Words
+
+```{r}
+add_unknown_words <- function(corpus) {
+    document_term_matrix <- 
+        DocumentTermMatrix(corpus,
+                           control = list(tokenize = function(x) NGramTokenizer(x, Weka_control(min = 1, max = 1)),
+                           wordLengths=c(1, Inf)))
+    words <- names(colSums(as.matrix(document_term_matrix)))
+    
+    counter <- 0
+    percentage_counter <- 0
+    percentage_complete <- 0
+    for(word in words) {
+
+        document_index <- which.max(tm_index(corpus, FUN = function(x) any(grep(paste0("\\b", word,"\\b"), content(x)))))
+        line_index <- which.max(grepl(paste0("\\b", word, "\\b"), content(corpus[[document_index]])))
+        content(corpus[[document_index]])[line_index] <-
+            sub(paste0("\\b", word, "\\b"), "<UNKNOWN>",
+                content(corpus[[document_index]])[line_index])
+
+        counter <- counter + 1
+        percentage_counter <- round(counter * 100 / length(words))
+        if(percentage_counter > percentage_complete & percentage_counter < 100) {
+            percentage_complete <- percentage_counter
+            print(paste0(percentage_complete, "% complete."))
+        }
+    }
+    print("complete.")
+    corpus
+}
+
+corpus_without_curse_words <- add_unknown_words(corpus_without_curse_words)
+```
+
+
+The requirement document include the following items:
+
+- Build basic n-gram model - using the exploratory analysis you performed, build a basic n-gram model for predicting the next word based on the previous 1, 2, or 3 words.
+
+- Build a model to handle unseen n-grams - in some cases people will want to type a combination of words that does not appear in the corpora. Build a model to handle cases where a particular n-gram isn't observed.
+
+These requirements basically describe [Katz's Back-off](https://en.wikipedia.org/wiki/Katz%27s_back-off_model), thus that will be the solution adopted. I don't think that makes any sense to implement a maximum likelihood estimation model with additive smoothing even for comparison. This has been done repeatedly in NLP literature.
+
+### Katz's Back-off
+
+The best resource I could find for Katz's Back-off is from the paper ["An Empirical Study of Smoothing Techniques for Language
+Modeling"](http://www.aclweb.org/anthology/P96-1041), from which I have obtained the formulas used in this section.
+
+That's a good complement to Katz's original paper, ["Estimation of Probabilities from Sparse Data for the Language Model Component of a Speech Recognizer"](https://pdfs.semanticscholar.org/969a/9ec5f24dabcfb9c70c7ee04625075a6c0a98.pdf).
+
+$$
+\begin{align}
+& P_{bo} (w_i \mid w_{i-n+1} \cdots w_{i-1}) \\[4pt]
+= {} & \begin{cases}
+    d_{w_{i-n+1} \cdots w_{i}} \dfrac{C(w_{i-n+1} \cdots w_{i-1}w_{i})}{C(w_{i-n+1} \cdots w_{i-1})} & \text{if } C(w_{i-n+1} \cdots w_i) > k \\[10pt]
+    \alpha_{w_{i-n+1} \cdots w_{i-1}} P_{bo}(w_i \mid w_{i-n+2} \cdots w_{i-1}) & \text{otherwise}
+\end{cases}
+\end{align}
+$$
+
+$$
+\alpha_{w_{i-n+1} \cdots w_{i -1}} = \frac{\beta_{w_{i-n+1} \cdots w_{i -1}}}        {1 - \sum_{ \{ w_i : C(w_{i-n+1} \cdots w_{i}) \gt k \} } P_{bo}(w_i \mid w_{i-n+2} \cdots w_{i-1})}
+$$
+
+Where $P_{ML}$ is the maximum likelihood estimator for the conditional probability.
+
+$$
+\beta_{w_{i-n+1} \cdots w_{i -1}} = 1 - \sum_{ \{w_i : C(w_{i-n+1} \cdots w_{i}) > k \} } d_{w_{i-n+1} \cdots w_{i}} \frac{C(w_{i-n+1}\cdots w_{i-1} w_{i})}{C(w_{i-n+1} \cdots w_{i-1})}
+$$
+
+#### Examples of Katz Back-off
+
+After consulting multiple resources over the web, I couldn't find a clear example of its use. For these reason, I have decided to put a full example of how to compute the probabilities for this model in this notebook (for future reference).
+
+We are going to show the calculation steps for the example: $P_{bo}(\text{"word"}|\text{"bird is the"})$.
+
+#### Example Without Back-off
+
+Let's start with the simplest case, suppose further that $C(\text{"bird is the word"}) > k$. In the case:
+
+$$
+P_{bo}(\text{"word"}|\text{"is the word"}) = d_{\text{"bird is the word"}} \frac{C({\text{"bird is the word"}})}{C({\text{"bird is the"}})}
+$$
+
+$d_{\text{"bird is the word"}}$ is computed using [Good-Turing frequency estimation](https://en.wikipedia.org/wiki/Good%E2%80%93Turing_frequency_estimation):
+
+$$
+d_{\text{"bird is the word"}} = \frac{(C(\text{"bird is the word"}) + 1)}{C(\text{"bird is the word"})} \times \frac{n_{C(\text{"bird is the word"}) + 1}}{n_{C(\text{"bird is the word"})}}
+$$
+
+Where $n_x$ is the number of n-grams that occured in the corpus exactly $x$ times.
+
+#### Example With a Single Back-off
+
+Let's start with the simplest case, suppose further that $C(\text{"bird is the word"}) \leq k$. In the case:
+
+$$
+P_{bo}(\text{"word"}|\text{"is the word"}) = \alpha_{\text{"bird is the"}} P_{bo}(\text{"word"} | \text{"is the"})
+$$
+
+Supposing that $C(\text{"is the word"}) \leq k$, we already know how to calculate that (previous section).
+
+
+$$
+\alpha_{\text{"bird is the"}} = \frac{\beta_{\text{"bird is the"}}}{\sum_{\{x:C(\text{"bird is the x"}) \leq k\}} P_{bo}(\text{"x"} | \text{"is the"})}
+$$
+
+Finally for $\beta$:
+
+$$
+\beta_{\text{"bird is the"}} = 1 - \sum_{\{x:C(\text{"is the x"}) \gt k\}}d_{\text{"is the x"}} \frac{C(\text{"is the x"})}{C(\text{"is the"})}
+$$
+
+Let's start with the discount by using Good-Turing's method:
+
+$$
+Count_{Good-Turing} = (Count + 1) \frac{n_{(Count + 1)}}{n_{Count}}
+$$
+
+Where $n_x$ is the number of n-grams observed $x$ times or "the frequency of words with frequency $x$".
+
+The Good-Turing method tries to estimate counts (frequency) of missing observations from counts of different existent observations.
+
+$$
+Discount = \frac{Count_{Good-Turing}}{Count}
+$$
+
+You will find this formula on Katz's original paper (formula (3)).
+
+#### Katz Back-off Implementation
+
+##### Map of Frequencies
+
+We are going to need a sub-set of n-grams of different sizes. I'm creating a function to generate an amalgate of n-grams with different sizes from the individual n-gram data-sets:
+
+```{r}
+create_frequencies <- function(corpus, min_count) {
+    one_to_four_gram_tokenizer <- function(x) 
+        NGramTokenizer(x, Weka_control(min = 1, max = 4))
+    document_term_matrix <- DocumentTermMatrix(corpus,
+                                               control = list(tokenize = one_to_four_gram_tokenizer,
+                                                              wordLengths=c(1, Inf)))
+    ngrams <- create_ngrams_data_frame(as.matrix(document_term_matrix))
+    ngrams$frequency <- sapply(ngrams$frequency, function(x) x - 1)
+    ngrams <- rbind(ngrams, data.frame(ngram = "<UNKNOWN>", frequency = nrow(ngrams)))
+    data.table(subset(ngrams, frequency > min_count))
+}
+
+frequencies_dt <- create_frequencies(corpus_without_curse_words, 0)
+sample_n(frequencies_dt, 12)
+```
+
+I'm going to pre-process the table of frequencies to speed-up computation by creating a column for "history" (tokens preceding the last token) and "word" (last token):
+
+```{r}
+extract_history <- function(ngram){
+    ifelse(length(ngram) > 1,
+           paste(ngram[1:(length(ngram)-1)], collapse = " "),
+           ""
+    )
+}
+
+extract_word <- function(ngram) paste(ngram[length(ngram)], collapse = " ")
+
+build_processed_ngram_frequencies <- function(frequencies_dt) {
+    data_dt <- data.table(frequencies_dt)
+    data_dt[, ngram := strsplit(ngram, split = " |'")]
+    data_dt[, ngram_length := sapply(ngram, length)]
+    data_dt[, history := sapply(ngram, extract_history)]
+    data_dt[, word := sapply(ngram, extract_word)]
+    data_dt[, ngram := sapply(ngram, paste, collapse = " ")]
+}
+
+ngram_frequencies_dt <- build_processed_ngram_frequencies(frequencies_dt)
+as.data.frame(ngram_frequencies_dt[ngram_length > 1, ][order(-frequency), ][1:50, ])
+```
+
+Computing probabilities for the model will require counts for histories as well, so let's create a data table specifically for this purpose:
+
+```{r}
+history_frequencies_dt <-
+    ngram_frequencies_dt[, c("history", "frequency")][, lapply(.SD, sum), by = list(history)]
+
+as.data.frame(history_frequencies_dt[order(-frequency), ][1:50])
+```
+
+
+##### Good-Turing Estimation
+
+The first step for applying the method is obtaning the frequency of sizes of observations:
+
+```{r}
+frequencies_of_frequencies <- table(ngram_frequencies_dt$frequency)
+frequencies_of_frequencies
+```
+
+Applying the Good-Turing formula:
+
+```{r}
+frequency_of_frequency <- function(frequency, frequencies_of_frequencies)
+    try_default(frequencies_of_frequencies[[toString(frequency)]], 1, quiet = TRUE)
+
+discount <- function(count, frequencies_of_frequencies) {
+    good_turing_count <- (count + 1) *
+        frequency_of_frequency(count + 1, frequencies_of_frequencies) /
+        frequency_of_frequency(count, frequencies_of_frequencies)
+    computed_discount <- good_turing_count / count
+    ifelse(computed_discount < 1, computed_discount, 1)
+}
+
+discount(1, frequencies_of_frequencies)
+```
+
+The following chunk implements all formulas required to compute the Katz's probability ($P_{bo}$ in the formula):
+
+```{r}
+count_ngram <- function(word_value, history_value, ngram_frequencies_dt) {
+    count <- ngram_frequencies_dt[word == word_value & history == history_value, ]$frequency
+    ifelse(length(count) > 0, count, 1)
+}
+
+count_history <- function(history_value, history_frequencies_dt) {
+    count <- history_frequencies_dt[history == history_value, ]$frequency
+    ifelse(length(count) > 0, count, 1)
+}
+
+total_words <- sum(ngram_frequencies_dt[ngram_length == 1, ]$frequency)
+
+count_ngram("t", "don", ngram_frequencies_dt)
+count_history("don", history_frequencies_dt)
+```
+
+I'm using a data table due to its better performance.
+
+##### Back-off
+
+```{r}
+backoff_history <- function(history) {
+    history_words <- strsplit(history, split = " |'")
+    ifelse(
+        length(history_words[[1]]) > 1,
+        trimws(paste(backoff_history_words <- history_words[[1]][2:length(history_words[[1]])], collapse = " ")),
+        ""
+    )
+}
+
+backoff_history("bird is the word")
+backoff_history(backoff_history("bird is the word"))
+backoff_history("")
+```
+
+##### Katz's Beta
+
+```{r}
+katz_beta <- function(history_value, k,
+                      ngram_frequencies_dt,
+                      history_frequencies_dt,
+                      frequencies_of_frequencies) {
+
+    counts <- ngram_frequencies_dt[history == history_value & frequency > k, ]$frequency
+    history_count <- count_history(history_value, history_frequencies_dt)
+    1 - ifelse(length(counts) > 0,
+               sum(
+                   sapply(counts,
+                          function(x) discount(x, frequencies_of_frequencies) * x / history_count
+                   )
+               ),
+               0
+    )
+}
+
+memoized_katz_beta <- addMemoization(katz_beta)
+
+memoized_katz_beta("didn", 5,
+                   ngram_frequencies_dt,
+                   history_frequencies_dt,
+                   frequencies_of_frequencies)
+```
+
+##### Katz's Alpha
+
+```{r}
+katz_alpha_summation <- function(history_value, k,
+                                 ngram_frequencies_dt,
+                                 history_frequencies_dt,
+                                 frequencies_of_frequencies) {
+    words <- ngram_frequencies_dt[history == history_value & frequency <= k, ]$word
+    ifelse(length(words) > 0,
+           sum(
+               sapply(words,
+                      katz_probability,
+                      history = backoff_history(history_value),
+                      k = k,
+                      ngram_frequencies_dt = ngram_frequencies_dt,
+                      history_frequencies_dt = history_frequencies_dt,
+                      frequencies_of_frequencies = frequencies_of_frequencies
+               )
+           ),
+           0
+    )
+}
+
+memoized_katz_alpha_summation <- addMemoization(katz_alpha_summation)
+
+katz_alpha <- function(history, k,
+                       ngram_frequencies_dt,
+                       history_frequencies_dt,
+                       frequencies_of_frequencies) {
+    
+    computed_katz_alpha_summation <- memoized_katz_alpha_summation(history, k,
+                                                                   ngram_frequencies_dt,
+                                                                   history_frequencies_dt,
+                                                                   frequencies_of_frequencies
+    )
+
+    computed_katz_beta <- memoized_katz_beta(history, k,
+                                              ngram_frequencies_dt,
+                                              history_frequencies_dt,
+                                              frequencies_of_frequencies
+    )
+
+    computed_katz_alpha <- ifelse(computed_katz_alpha_summation != 0,
+                                  computed_katz_beta / computed_katz_alpha_summation,
+                                  1)
+    ifelse(computed_katz_alpha < 1, computed_katz_alpha, 1)
+}
+
+memoized_katz_alpha <- addMemoization(katz_alpha)
+
+katz_probability <- function(word, history, k,
+                             ngram_frequencies_dt,
+                             history_frequencies_dt,
+                             frequencies_of_frequencies,
+                             verbose = FALSE) {
+    if(verbose) print(paste0("katz_probability(word: [", word, "], history: [", history, "])..."))
+
+    word_with_history <- trimws(paste(history, word))
+    count <- count_ngram(word, history, ngram_frequencies_dt)
+    
+    probability <- ifelse(
+        history == "",
+        discount(count, frequencies_of_frequencies) * count / total_words,
+        ifelse(count > k,
+               discount(count, frequencies_of_frequencies) * count / count_history(history, ngram_frequencies_dt),
+               memoized_katz_alpha(history, k, ngram_frequencies_dt, history_frequencies_dt, frequencies_of_frequencies) *
+                   katz_probability(word, backoff_history(history), k,
+                                    ngram_frequencies_dt,
+                                    history_frequencies_dt,
+                                    frequencies_of_frequencies,
+                                    verbose = verbose)
+        )
+    )
+
+    if(verbose) print(paste0("katz_probability(word: [", word, "], history: [", history, "]) = ", probability))
+    probability
+}
+
+katz_alpha_summation("didn", 5, ngram_frequencies_dt, history_frequencies_dt, frequencies_of_frequencies)
+katz_alpha("didn", 5, ngram_frequencies_dt, history_frequencies_dt, frequencies_of_frequencies)
+katz_probability("s", "didn", 5, ngram_frequencies_dt, history_frequencies_dt, frequencies_of_frequencies)
+```
+
+Given that $\beta_i$ and $\sum_{i} \alpha_i$ are probabilities, they need to be smaller or equal to one. In practice though, we are working with estimates obtained from the text corpus and estimations will be as good as our data, thus the calculations might result in values greater than one.
+
+Another issue is that computers introduce rounding errors. For this reason, we are limiting the value of $\alpha_i$ and $\beta_i$ to one, that is, if the estimate $\alpha_i$ and $\beta_i$ exceeds one, we assume they are actually equal to one.
+
+#### Computing a Markov Chain Trainsition Matrix
+
+Now that we can compute Katz's probabilities, we will create a transition matrix, which is a representation of a [Markov Chain](https://en.wikipedia.org/wiki/Markov_chain):
+
+```{r}
+create_transition_matrix <- function(k,
+                                     ngram_frequencies_dt,
+                                     history_frequencies_dt,
+                                     frequencies_of_frequencies,
+                                     min_count = 3, verbose = FALSE) {
+    
+    prediction_data <- ngram_frequencies_dt[ngram_length > 1 & frequency > min_count, ]
+    
+    histories <- unique(c("", prediction_data$history))
+    print(paste0("history size: ", length(histories)))
+    
+    words <- unique(prediction_data$word)
+    print(paste0("word size: ", length(words)))
+    
+    transition_matrix <- matrix(NA, length(histories), length(words))
+    rownames(transition_matrix) <- histories
+    colnames(transition_matrix) <- words
+    
+    percentage_complete <- 0
+    percentage_counter <- 0
+    for(i in 1:length(histories)){
+        for(j in 1:length(words)){
+            transition_matrix[i, j] <- katz_probability(words[[j]],
+                                                        histories[[i]],
+                                                        k,
+                                                        ngram_frequencies_dt,
+                                                        history_frequencies_dt,
+                                                        frequencies_of_frequencies,
+                                                        verbose = verbose)
+        }
+        percentage_complete <- round((i * length(words) + j + 1) / (length(histories) * length(words)) * 100)
+        if(percentage_complete > percentage_counter & percentage_complete < 100) { 
+            percentage_counter <- percentage_complete
+            print(paste0(percentage_counter, "% complete."))
+        }
+    }
+    print("complete.")
+    transition_matrix
+}
+
+model <- create_transition_matrix(5,
+                                  ngram_frequencies_dt,
+                                  history_frequencies_dt,
+                                  frequencies_of_frequencies)
+str(model)
+```
+
+To optimize the Katz's probability calculation, I have ran the function that creates the transition matrix with profililng:
+
+```{r, eval = FALSE}
+Rprof("./output.txt")
+model <- create_transition_matrix(5,
+                                  ngram_frequencies_dt,
+                                  history_frequencies_dt,
+                                  frequencies_of_frequencies)
+summaryRprof("./output.txt")
+```
+
+I have disabled this chunk given that I won't needed any longer, but I'm keeping it for future reference.
+
+Let's do a sanity check:
+
+```{r}
+which(is.na(model), arr.ind = TRUE)
+```
+
+All rows are in the range value for probabilities and there aren't any NAs.
+
+Given that we are going to ultimately load the model into memory in the keyboard typing prediction app and that shinyapps.io has a limitation (for the free account) of 1GB, let's also take a look at the model's size
+
+```{r}
+object.size(model)
+```
+
+### Making Predictions
+
+Here are the history words supported by our toy model:
+
+```{r}
+rownames(model)
+```
+
+As well as the words supported:
+
+```{r}
+colnames(model)
+```
+
+Let's see if the predictions make sense:
+
+```{r}
+extract_words_from_history <- function(model) unique(
+    unname(
+        unlist(
+            sapply(rownames(model), function(x) ifelse(x == "", x, strsplit(x, split = " ")))
+        )
+    )
+)
+
+build_top_suggestions <- function(model, history, word_row, n) {
+    word_row["<unknown>"] <- NA
+    top_suggestions_indexes <- head(order(word_row, decreasing = TRUE), n = n)
+    top_suggestions <- colnames(model)[top_suggestions_indexes]
+    names(top_suggestions) <- model[history, top_suggestions_indexes]
+    top_suggestions
+}
+
+replace_unknown_words <-function(history, model) {
+    words <- extract_words_from_history(model)
+    if(history == "") return(history)
+    history_words <- strsplit(history, split = " ")
+    history_words <- sapply(history_words, function(x) ifelse(x %in% words, x, "<unknown>"))
+    paste(history_words, collapse = " ")
+}
+
+suggestions <- function(model, history, n = 5) {
+    history <- replace_unknown_words(history, model)
+    history <- ifelse(history == "", 1, history)
+    word_row <- try_default(model[history, ], c(), quiet = TRUE)
+    if(length(word_row) > 0) build_top_suggestions(model, history, word_row, n)
+    else suggestions(model, backoff_history(history), n = n)
+}
+
+suggestions(model, "don", n = 5)
+```
+
+
+```{r}
+suggestions(model, "last")
+```
+
+
+```{r}
+suggestions(model, "next")
+```
+
+
+```{r}
+suggestions(model, "new")
+```
+
+The suggestions make sense, so it seems like we are in good shape. In the next section, we are going to evaluate how good our model is in a more quantitative manner.
+
+### Model Perplexity
+
+We are going to use [perplexity](https://en.wikipedia.org/wiki/Perplexity) as a measure for model performance:
+
+$$
+2^H = 2^{- \frac{1}{L - m +1} \sum_{l = m}^{L} log_2 P(w_i|w_{l - m + 1}^{l - 1})}
+$$
+
+Where: $w_i$ is the test word sequence and $m$ is the N-Gram size. Given that $m + 1 \ll L$ and our model has N-Grams of multiple sizes, I'm going to ignore $m + 1$ in the denominator.
+
+First we would need a function to extract conditional probabilities from the model:
+
+```{r}
+model_probability <- function(model, word, history) {
+    if(!(word %in% colnames(model))) word <- "<unknown>"
+    if(history == "") history <- 1
+    probability <- try_default(model[history, word], NA, quiet = TRUE)
+    ifelse(is.na(probability),
+           model_probability(model, word, backoff_history(history)),
+           probability)
+}
+
+model_probability(model, "t", "didn")
+model_probability(model, "<gibberish>", "didn")
+model_probability(model, "back", "")
+```
+
+We are going to sample again from the corpus and create a test corpus:
+
+```{r}
+test_corpus <- VCorpus(DirSource("./data/samples/testing"), readerControl = list(language = "en_US"))
+test_corpus <- clean_corpus(test_corpus)
+test_corpus <- tm_map(test_corpus, removeWords, curse_words)
+
+two_to_four_ngrams <- function(x) 
+  NGramTokenizer(x, Weka_control(min = 2, max = 4))
+
+document_term_matrix <- DocumentTermMatrix(corpus,
+                                           control = list(tokenize = two_to_four_ngrams,
+                                                          wordLengths=c(1, Inf)))
+
+test_data <- build_processed_ngram_frequencies(create_ngrams_data_frame(as.matrix(document_term_matrix)))
+sample_n(test_data, 12)
+```
+
+Here we calculate perplexity for different N-Gram sizes:
+
+```{r}
+entropy <- function(model, test_data, ngram_length) {
+     probabilities <- mapply(function(word, history) model_probability(model = model, word, history),
+                             test_data$word, test_data$history)
+     -sum(log(probabilities, base = 2)) / length(probabilities)
+}
+
+ngram_perplexity <- function(ngram_length_value, model, test_data) {
+    ngram_data <- test_data[ngram_length == ngram_length_value, ]
+    2^(entropy(model, ngram_data, ngram_length_value))
+}
+
+perplexity <- function(ngram_range, model, test_data) {
+    perplexities <- sapply(ngram_range, 
+                           ngram_perplexity,
+                           model = model,
+                           test_data = test_data
+    )
+
+    data.frame(ngram_size = ngram_range,
+               perplexity = perplexities
+    )
+}
+
+perplexity(2:4, model, test_data)
+```
+
+### Saving the Model to Disk
+
+```{r}
+saveRDS(model, "./data/model.rds")
+```
+
+Now the transition matrix has been serialized and saved as a file named `model.rds`. To load the object into R's environment execute the following command:
+
+```{r, eval = FALSE}
+model <- readRDS(mod, "./data/model.rds")
+```
+
+That's how we're going to load our model in the ShinyApp.
+
 ## Results
+
+### Exploratory Data Analysis
 
 We have confirmed that the distribution of words follow some known theoretical properties by analyzing a randomly sampled sub-set of the available data. We are going to exploit such properties to build a prediction model for keyboard typing.
 
@@ -525,3 +1185,16 @@ We could increase coverage by choosing words more aligned with the vocabulary of
 
 - Creating groups of users into different profiles (casual, business, scientific, etc) and respective models. An option would be to give the user the option of choosing an specific profile on the fly according with their current needs or commit to a single one when they sign-up for the service.
 
+### Model Design
+
+We are going to store our model as a Markov Chain Transition Matrix.
+
+Our knowledge of the word coverage will allows us to limit the number of N-Grams utilized (we know we can cover 90% of the text with a fraction of the N-Grams).
+
+The model is a transition matrix with size ($\text{Number of History N-Grams} \times \text{Number of Predicted Words}$). This matrix size is the number of parameters we need.
+
+We are going to smooth probabilities using Good-Turing estimation.
+
+We are going to evaluate our model by calculating the model's perplexity.
+
+We are going to use Katz's Back-off to estimate the probability of unobserved n-grams.

@@ -1,2 +1,6 @@
 data
 swiftrkey_cache
+.Rproj.user
+.Rcache
+.Rhistory
+*.rds
