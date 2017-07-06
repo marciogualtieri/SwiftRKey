@@ -296,7 +296,7 @@ load_curse_words <- function(curse_words_url) {
     connection <- url(curse_words_url)
     lines <- readLines(connection)
     close(connection)
-    stemDocument(lines)
+    lines
 }
 
 curse_words <- load_curse_words(
