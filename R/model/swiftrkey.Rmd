@@ -1,0 +1,41 @@
+---
+title: "Create R Package for SwftRKey model"
+output: html_notebook
+---
+
+## Setup
+
+```{r, eval = FALSE}
+install.packages(c("devtools", "roxygen2", "knitr"))
+install.packages("mixtools")
+```
+
+## Load the Libraries
+
+```{r}
+library("devtools")
+library("roxygen2")
+library("knitr")
+```
+
+
+## Create the Package Directory
+
+```{r}
+create("swiftrkey")
+```
+
+## Build & Reload Package
+
+To build your package, go to RStudio's menu, then `Build` > `Build and Reload`, or using the command-line:
+
+> $ R CMD INSTALL --no-multiarch --with-keep.source swiftrkey
+
+## Install from GitHub
+
+This package can also be installed from GitHub:
+
+```{r}
+install_github("marciogualtieri/SwifRKey", subdir="R/model/swifrkey")
+```
+

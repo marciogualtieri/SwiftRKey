@@ -1,6 +1,5 @@
 source("utils.R")
 
-model <- readRDS("./data/model.rds")
 current_suggestions <- as.list(replicate(6, ""))
 first_keystroke <- TRUE
 keystroke_discount <- 0
@@ -63,12 +62,12 @@ create_text_input <- function(input, output, session) {
             if(length(suggestions) > 0) {
                 sapply(1:length(current_suggestions), update_suggestion_button, session = session)
                 show(id = "suggestions_panel", anim = TRUE)
-                
+
             }
         } else
             hide(id = "suggestions_panel", anim = TRUE)
     })
-    
+
     sapply(1:length(current_suggestions), create_suggestion_button_observer, session = session, input = input)
     create_submission_button_observer(input, output)
 }

@@ -17,7 +17,7 @@ shinyServer(function(input, output, session) {
         update_frequencies()
         print("Emptying submitted data...")
         SUBMISSIONS_DATA <<- empty_submissions_data()
-        print("Boom. Done!")
+        print("Boom. Done.")
     })
 
     apply_styles()
