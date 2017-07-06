@@ -3,7 +3,7 @@ epithets <- readLines("./data/epithets.txt")
 remove_epithets <- function(text) {
     words <- strsplit(text, split = "[[:punct:] ]")
     for(word in words[[1]]) {
-        if(word %in% epithets) text <- gsub(word, "<epithet>", text)
+        if(tolower(word) %in% epithets) text <- gsub(word, "<epithet>", text)
     }
     text
 }
@@ -16,7 +16,7 @@ clean_corpus <- function(corpus, words_to_remove){
     return(corpus)
 }
 
-tokenizer <- function(x) 
+tokenizer <- function(x)
     NGramTokenizer(x, Weka_control(min = 1, max = 1))
 
 create_frequencies_data_frame <- function(document_term_matrix) {
@@ -40,18 +40,13 @@ extract_word_frequencies <- function(data) {
     return(frequencies)
 }
 
-frequency_barchart <-function(frequencies)
-    ggplot(frequencies, aes(x = word, y = frequency)) +
-    geom_bar(stat="identity", fill = "grey") +
-    scale_x_discrete(limits = frequencies$word) +
-    ggtitle(paste("Top", nrow(frequencies), "Word Frequencies Typed")) +
-    ylab("Frequency") +
-    theme(axis.text.x = element_text(size = 12, angle = 90, hjust = 1, vjust = 0.5)) +
-    theme(plot.title = element_text(size = 18, face = "bold",
-                                    hjust = 0.5, margin = margin(b = 30, unit = "pt"))) +
-    theme(axis.title.x = element_blank()) +
-    theme(axis.title.y = element_text(size = 14, face="bold")) +
-    theme(panel.background = element_blank(), axis.line = element_line(colour = "black")) +
-    theme(panel.border = element_rect(colour = "black", fill = NA, size = 0.5)) +
-    theme(strip.background = element_rect(fill = alpha("grey", 0.3), color = "black", size = 0.5)) +
-    theme(legend.title = element_blank())
+frequency_barchart <-function(frequencies) {
+    par(lwd = 3)
+    barplot(frequencies$frequency, names.arg = frequencies$word,
+         main = "Top Words Typed",
+         xlab ="Word", ylab = "Frequency",
+         font.lab = 2,
+         col = alpha("grey", 0.8),
+         border = "grey")
+    box(lwd = 1, lty = "solid")
+}

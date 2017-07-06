@@ -1,7 +1,5 @@
-data
-swiftrkey_cache
-.Rproj.user
-.Rcache
 .RData
 .Rhistory
-*.rds
+.Rcache
+.Rproj.user
+*_cache

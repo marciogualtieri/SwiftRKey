@@ -1,48 +1,38 @@
-library(shiny)
-library(shinyjs)
-library(dplyr)
-library(wordcloud)
 library(tm)
 library(qdap)
 library(RWeka)
-library(ggplot2)
+library(wordcloud)
 library(snakecase)
 library(swiftrkey)
+library(scales)
+
+library(shiny)
+library(shinyjs)
 
 options(mc.cores=1)
 options(shiny.maxRequestSize=30*1024^2)
 
-STATISTICS_DATA_FILE <- "./data/statistics.rds"
+STATISTICS_DATA_FILE <- "./data/statistics.rda"
+FREQUENCIES_DATA_FILE <- "./data/frequencies.rda"
+MAX_WORDS <- 10
 
-FREQUENCIES_DATA_FILE <- "./data/frequencies.rds"
+STATISTICS_DATA <- data.frame(statistic = c("Suggestions Given (#)",
+                                             "Suggestions Accepted (#)",
+                                             "Suggestions Accepted (%)",
+                                             "Characters Submitted (#)",
+                                             "Keystrokes (#)",
+                                             "Keystrokes Saved (%)",
+                                             "Time Typing (secs)",
+                                             "Time Saved (secs)",
+                                             "Time Saved (%)"),
+                               value = replicate(9, 0)
+)
+if(file.exists(STATISTICS_DATA_FILE)) load(file = STATISTICS_DATA_FILE)
 
-MAX_WORDS <- 30
-
-load_statistics <- function()
-    if(file.exists(STATISTICS_DATA_FILE)) {
-        readRDS(STATISTICS_DATA_FILE)
-    } else {
-        data.frame(statistic = c("Suggestions Given (#)",
-                                 "Suggestions Accepted (#)",
-                                 "Suggestions Accepted (%)",
-                                 "Characters Submitted (#)",
-                                 "Keystrokes (#)",
-                                 "Keystrokes Saved (%)",
-                                 "Time Typing (secs)",
-                                 "Time Saved (secs)",
-                                 "Time Saved (%)"),
-                   value = replicate(9, 0)
-        )
-    }
-
-load_frequencies <- function()
-    if(file.exists(FREQUENCIES_DATA_FILE)) {
-        readRDS(FREQUENCIES_DATA_FILE)
-    } else {
-        data.frame(word = character(0),
-                   frequency = numeric(0)
-        )
-    }
+FREQUENCIES_DATA <- data.frame(word = character(0),
+                               frequency = numeric(0)
+)
+if(file.exists(FREQUENCIES_DATA_FILE)) load(file = FREQUENCIES_DATA_FILE)
 
 empty_submissions_data <- function()
     data.frame(
@@ -111,9 +101,10 @@ update_frequencies <- function() {
     if(nrow(SUBMISSIONS_DATA) > 0) {
         max_words <- 30
         new_frequencies <- extract_word_frequencies(SUBMISSIONS_DATA$submission)
-        updated_frequencies <- rbind(FREQUENCIES_DATA, new_frequencies) %>%
-            group_by(word) %>%
-            summarize_all(.funs = sum)
+        updated_frequencies <- rbind(FREQUENCIES_DATA, new_frequencies)
+
+        updated_frequencies <- aggregate(frequency ~ word, data = updated_frequencies,
+                                         FUN = sum)
 
         if(nrow(updated_frequencies) > max_words) {
             FREQUENCIES_DATA <<- updated_frequencies[1:MAX_WORDS, ]
@@ -124,5 +115,3 @@ update_frequencies <- function() {
 }
 
 SUBMISSIONS_DATA <- empty_submissions_data()
-STATISTICS_DATA <- load_statistics()
-FREQUENCIES_DATA <- load_frequencies()

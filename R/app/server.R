@@ -5,19 +5,13 @@ source("controllers/readme_controller.R")
 source("controllers/dashboard_controller.R")
 
 shinyServer(function(input, output, session) {
-    session$onSessionEnded(function() {
-        saveRDS(STATISTICS_DATA, STATISTICS_DATA_FILE)
-        saveRDS(FREQUENCIES_DATA, FREQUENCIES_DATA_FILE)
-    })
-    
     observe({
-        invalidateLater(180000, session)
-        print("Updating dashboard data...")
+        invalidateLater(60000, session)
         update_statistics()
         update_frequencies()
-        print("Emptying submitted data...")
+        save(STATISTICS_DATA, file = STATISTICS_DATA_FILE)
+        save(FREQUENCIES_DATA, file = FREQUENCIES_DATA_FILE)
         SUBMISSIONS_DATA <<- empty_submissions_data()
-        print("Boom. Done.")
     })
 
     apply_styles()
