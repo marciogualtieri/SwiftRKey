@@ -25,7 +25,7 @@ SwitftRKey
 Overview
 --------
 
-The purpose of this app, which has been developed with the [Shiny Framework](https://shiny.rstudio.com/), is showing off a possible use for the [text predicting model created previously](../notebook/).
+The purpose of this app, which has been developed with the [Shiny Framework](https://shiny.rstudio.com/), is showing off a possible use for the [text predicting model created previously](https://marciogualtieri.github.io/SwiftRKey/R/notebook/swiftrkey.html).
 
 A demo of the SwiftRKey app can be found [here](https://marciogualtieri.shinyapps.io/swiftrkey/). It's important to note that the app has been deployed to [shinyapps.io](https://shinyapps.io) with a free account, thus there is a limit of 1Gb of memory, which somewhat restricts how sophisticated the application can be. I will detail its features in the sections that will follow.
 

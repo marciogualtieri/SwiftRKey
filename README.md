@@ -6,7 +6,7 @@ This app has been inspired by [SwiftKey](https://swiftkey.com/en) and it isn't i
 
 You should probably navigate this project in the following order:
 
-- Text-mining, Natural Language Processing and Exploratory Data Analysis: Check the [project's notebook](./R/notebook).
+- Text-mining, Natural Language Processing and Exploratory Data Analysis: Check the [project's notebook](https://marciogualtieri.github.io/SwiftRKey/R/notebook/swiftrkey.html).
 
 - Model Usage: Check the [R library that encapsulates the prediction algorithm](./R/model).
 
