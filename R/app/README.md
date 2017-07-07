@@ -11,7 +11,7 @@
     -   [How to Deploy the App](#how-to-deploy-the-app)
 -   [Prediction Model](#prediction-model)
     -   [How to Deploy the Model](#how-to-deploy-the-model)
-    -   [Example of USe](#example-of-use)
+    -   [Example of Use](#example-of-use)
 
 Overview
 --------
@@ -116,7 +116,7 @@ This information might give some insight about what are the most used words and 
 
 The application has been designed following a [MVC Pattern](https://en.wikipedia.org/wiki/Model%E2%80%93view%E2%80%93controller). The following diagram illustrates the architecture:
 
-    ![](https://g.gravizo.com/source/svg/custom_mark1?https%3A%2F%2Fraw.githubusercontent.com%2Fmarciogualtieri%2FSwiftRKey%2Fmaster%2FR%2Fapp%2FREADME.md)
+![](https://g.gravizo.com/source/svg/custom_mark1?https%3A%2F%2Fraw.githubusercontent.com%2Fmarciogualtieri%2FSwiftRKey%2Fmaster%2FR%2Fapp%2FREADME.md)
 
 <!---
 custom_mark1
@@ -130,7 +130,7 @@ custom_mark1
   }
 custom_mark1
 -->
-    ![](https://g.gravizo.com/source/svg/custom_mark2?https%3A%2F%2Fraw.githubusercontent.com%2Fmarciogualtieri%2FSwiftRKey%2Fmaster%2FR%2Fapp%2FREADME.md)
+![](https://g.gravizo.com/source/svg/custom_mark2?https%3A%2F%2Fraw.githubusercontent.com%2Fmarciogualtieri%2FSwiftRKey%2Fmaster%2FR%2Fapp%2FREADME.md)
 
 <!---
 custom_mark2
@@ -233,7 +233,7 @@ At the moment there's a single public function inside. For help, run the followi
 
 ![SwiftRKey Help](./images/swiftrkey_help.png)
 
-### Example of USe
+### Example of Use
 
 ``` r
 suggestions(model, "new", n = 3)

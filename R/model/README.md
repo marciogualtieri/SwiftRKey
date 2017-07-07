@@ -16,7 +16,7 @@ The purpose of this library is encapsulating the [text predicting model created 
 Installation Instructions
 -------------------------
 
-This package can also be installed from GitHub using the `devtools` package. To install `devtools` run the following command:
+This package can be installed from GitHub using the `devtools` package. If you don't have it already, install `devtools` with the following command:
 
 ``` r
 install.packages("devtools")
@@ -121,4 +121,4 @@ create("swiftrkey")
 
 To build your package, go to RStudio's menu, then `Build` &gt; `Build and Reload`, or using the command-line:
 
-> $ R CMD INSTALL --no-multiarch --with-keep.source swiftrkey
+    $ R CMD INSTALL --no-multiarch --with-keep.source swiftrkey
