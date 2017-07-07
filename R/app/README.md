@@ -1,21 +1,27 @@
--   [Overview](#overview)
--   [Shiny Application](#shiny-application)
-    -   [User Guide](#user-guide)
-        -   [Keyboard](#keyboard)
-        -   [Dashboard](#dashboard)
-            -   [Statistics](#statistics)
-            -   [Frequency Plots](#frequency-plots)
-    -   [Developer Guide](#developer-guide)
-        -   [Architecture](#architecture)
-        -   [Source Files](#source-files)
-    -   [How to Deploy the App](#how-to-deploy-the-app)
--   [Prediction Model](#prediction-model)
-    -   [How to Deploy the Model](#how-to-deploy-the-model)
-    -   [Example of Use](#example-of-use)
+-   [SwitftRKey](#switftrkey)
+    -   [Overview](#overview)
+    -   [Shiny Application](#shiny-application)
+        -   [User Guide](#user-guide)
+            -   [Keyboard](#keyboard)
+            -   [Dashboard](#dashboard)
+                -   [Statistics](#statistics)
+                -   [Frequency Plots](#frequency-plots)
+        -   [Developer Guide](#developer-guide)
+            -   [Architecture](#architecture)
+            -   [Source Files](#source-files)
+        -   [How to Deploy the App](#how-to-deploy-the-app)
+    -   [Prediction Model](#prediction-model)
+        -   [How to Deploy the Model](#how-to-deploy-the-model)
+        -   [Example of Use](#example-of-use)
+
+SwitftRKey
+==========
 
 <p align="center">
 <img alt="SwiftRKey" src="images/swiftrkeylogo.png" />
 </p>
+<br/>
+
 Overview
 --------
 

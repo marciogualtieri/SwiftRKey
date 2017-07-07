@@ -2,20 +2,24 @@
 title: 'SwitftRKey: A typing prediction app written in R'
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
-  md_document:
-    df_print: kable
-    toc: yes
-    toc_depth: 6
-    variant: markdown_github
   html_document:
     css: ./www/style.css
     df_print: kable
     self_contained: no
     toc: yes
     toc_depth: 6
+  md_document:
+    df_print: kable
+    toc: yes
+    toc_depth: 6
+    variant: markdown_github
 ---
 
+# SwitftRKey
+
 <p align="center"><img alt="SwiftRKey" src="images/swiftrkeylogo.png" /></p>
+
+<br/>
 
 ## Overview
 
