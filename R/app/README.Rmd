@@ -1,20 +1,20 @@
--   [Overview](#overview)
--   [Shiny Application](#shiny-application)
-    -   [User Guide](#user-guide)
-        -   [Keyboard](#keyboard)
-        -   [Dashboard](#dashboard)
-            -   [Statistics](#statistics)
-            -   [Frequency Plots](#frequency-plots)
-    -   [Developer Guide](#developer-guide)
-        -   [Architecture](#architecture)
-        -   [Source Files](#source-files)
-    -   [How to Deploy the App](#how-to-deploy-the-app)
--   [Prediction Model](#prediction-model)
-    -   [How to Deploy the Model](#how-to-deploy-the-model)
-    -   [Example of USe](#example-of-use)
+---
+title: 'SwitftRKey: A typing prediction app written in R'
+author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
+output:
+  md_document:
+    df_print: kable
+    toc: yes
+    toc_depth: 6
+    variant: markdown_github
+  html_document:
+    css: ./www/style.css
+    df_print: kable
+    toc: yes
+    toc_depth: 6
+---
 
-Overview
---------
+## Overview
 
 The purpose of this app, which has been developed with the [Shiny Framework](https://shiny.rstudio.com/), is showing off a possible use for the [text predicting model created previously](../notebook/).
 
@@ -22,8 +22,7 @@ A demo of the SwiftRKey app can be found [here](https://marciogualtieri.shinyapp
 
 For easy deployment, the model has been packaged as [a R library](../model) which can be easily reused in other Shiny applications or even in a R notebook.
 
-Shiny Application
------------------
+## Shiny Application
 
 ### User Guide
 
@@ -49,56 +48,17 @@ When a word followed by a white space is inputed, the words typed so far are use
 
 The table on the right shows general keyboard usage statistics:
 
-<table>
-<colgroup>
-<col width="17%" />
-<col width="82%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th>Statistics</th>
-<th>Meaning</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Suggestions Given (#)</td>
-<td>Number of prediction attempts (suggestions) so far.</td>
-</tr>
-<tr class="even">
-<td>Suggestions Accepted (#)</td>
-<td>Numnber of suggestions that have been accepted by the user.</td>
-</tr>
-<tr class="odd">
-<td>Suggestions Accepted (%)</td>
-<td>Percentage of suggestions that have been accepted.</td>
-</tr>
-<tr class="even">
-<td>Characters Submitted (#)</td>
-<td>Number of characters submitted by the user.</td>
-</tr>
-<tr class="odd">
-<td>Keystrokes (#)</td>
-<td>Number of keystrokes performed by the user.</td>
-</tr>
-<tr class="even">
-<td>Keystrokes Saved (%)</td>
-<td>Percentage of characters that were not typed by user, but came from suggestions accepted instead.</td>
-</tr>
-<tr class="odd">
-<td>Time Typing (secs)</td>
-<td>Time spent inputing text.</td>
-</tr>
-<tr class="even">
-<td>Time Saved (secs)</td>
-<td>Estimate of how much more time the user would've spent inputing text if not using suggestions.</td>
-</tr>
-<tr class="odd">
-<td>Time Saved (%)</td>
-<td>Time saved as a percentage. Int the screencap, &quot;Time Saved (5): 6.3&quot; means that the user spent 6.33% less time typing.</td>
-</tr>
-</tbody>
-</table>
+|Statistics              | Meaning                                                                                                              |
+|------------------------|----------------------------------------------------------------------------------------------------------------------|
+|Suggestions Given (#)   |Number of prediction attempts (suggestions) so far.                                                                   |
+|Suggestions Accepted (#)|Numnber of suggestions that have been accepted by the user.                                                           |
+|Suggestions Accepted (%)|Percentage of suggestions that have been accepted.                                                                    |
+|Characters Submitted (#)|Number of characters submitted by the user.                                                                           |
+|Keystrokes (#)          |Number of keystrokes performed by the user.                                                                           |
+|Keystrokes Saved (%)    |Percentage of characters that were not typed by user, but came from suggestions accepted instead.                     |
+|Time Typing (secs)      |Time spent inputing text.                                                                                             |
+|Time Saved (secs)       |Estimate of how much more time the user would've spent inputing text if not using suggestions.                        |
+|Time Saved (%)          |Time saved as a percentage. Int the screencap, "Time Saved (5): 6.3" means that the user spent 6.33% less time typing.|
 
 According with the screencap, around 58% of the suggested words have been accepted, saving the user 33 keystrokes and 149 seconds that would've spent typing, thanks to the typing prediction feature. That demonstrably shows, in an quantitative way, that the feature is effective.
 
@@ -130,6 +90,7 @@ custom_mark1
   }
 custom_mark1
 -->
+
     ![](https://g.gravizo.com/source/svg/custom_mark2?https%3A%2F%2Fraw.githubusercontent.com%2Fmarciogualtieri%2FSwiftRKey%2Fmaster%2FR%2Fapp%2FREADME.md)
 
 <!---
@@ -144,31 +105,32 @@ custom_mark2
   }
 custom_mark2
 -->
+
 In short, whatever code you put inside `ShinyUI()` is a view and whatever code you put inside `ShinyServer()` is a controller. That helps to keep the R files small and manageable.
 
 #### Source Files
 
-**Controllers:**
-
+ **Controllers:**
+            
             └── controllers
                 ├── dashboard_controller.R (Dashboard showing typing statistics)
                 ├── keyboard_controller.R  (The text input interface with next word prediction)
                 └── readme_controller.R    (Shows this help age)
 
 **Views:**
-
+            
             └── views
                 ├── dashboard_view.R
                 ├── keyboard_view.R
                 └── readme_view.R
 
 **Shiny's standard Server and UI files:**
-
+            
             ├── server.R 
             └── ui.R
 
 **Global Code:**
-
+            
             └── globals.R            (General app parameters and app state persistence code)
 
 
@@ -177,7 +139,7 @@ In short, whatever code you put inside `ShinyUI()` is a view and whatever code y
                                       not support class as a parameter)
 
 **Resources:**
-
+            
             └── www
                 ├── data
                 │   └── epithets.txt (List of curse words for filter)
@@ -187,7 +149,7 @@ In short, whatever code you put inside `ShinyUI()` is a view and whatever code y
 
 Before you can deploy to shinyapps.io, you need to set your account info:
 
-``` r
+```{r, eval = FALSE}
 rsconnect::setAccountInfo(name='<USERNAME>',
                           token='<TOKEN>',
                           secret='<SECRET>')
@@ -197,83 +159,55 @@ You may get the full command, complete with your username/token/secret from the 
 
 Once your account is set, you may deploy by runnning the following command:
 
-``` r
+```{r, eval = FALSE}
 rsconnect::deployApp("/.../SwiftRKey/R/app",
                      appName = "swiftrkey")
 ```
 
-Prediction Model
-----------------
+## Prediction Model
 
 ### How to Deploy the Model
 
 The model alone can be found on [GitHub](../model) as a R package. You may install it directly from GitHub with the `devtools` package:
 
-``` r
+```{r, eval = FALSE}
 install.packages("devtools")
 ```
 
 Once `devtools` has been installed, you may install the model using the following command:
 
-``` r
+```{r, eval = FALSE}
 install_github("marciogualtieri/SwiftRKey", subdir="R/model/swiftrkey")
 ```
 
 The model's package name is `swiftrkey`, which now can be loaded by the following command:
 
-``` r
+```{r}
 suppressMessages(library(swiftrkey))
 ```
 
 At the moment there's a single public function inside. For help, run the following command:
 
-``` r
+```{r}
 ?suggestions
 ```
 
 ![SwiftRKey Help](./images/swiftrkey_help.png)
 
-### Example of USe
+### Example of Use
 
-``` r
+```{r}
 suggestions(model, "new", n = 3)
 ```
 
-    ## [[1]]
-    ## [1] "york"
-    ## 
-    ## [[2]]
-    ## [1] "jersey"
-    ## 
-    ## [[3]]
-    ## [1] "year"
-
-``` r
+```{r}
 suggestions(model, "new york", n = 3)
 ```
 
-    ## [[1]]
-    ## [1] "city"
-    ## 
-    ## [[2]]
-    ## [1] "s"
-    ## 
-    ## [[3]]
-    ## [1] "just"
-
 If you want to know the probabilities for each suggestion, you may run the following command instead:
 
-``` r
+```{r}
 suggestions(model, "new", n = 3, with_probabilities = TRUE)
 ```
-
-    ## $`0.579710144927536`
-    ## [1] "york"
-    ## 
-    ## $`0.247427011132115`
-    ## [1] "jersey"
-    ## 
-    ## $`0.173913043478261`
-    ## [1] "year"
 
 The `model` object is a Markov transition matrix, which is loaded with the library by default. In future releases I may add other models, e.g. for different languages (like`model_german` and `model_french`) or generated by different methods (I have used Katz backoff, for more details refer to the [notebook](../notebook)).

@@ -1160,16 +1160,21 @@ perplexity(2:4, model, test_data)
 ### Saving the Model to Disk
 
 ```{r}
-saveRDS(model, "./data/model.rds")
+save(model, file = "./data/model.rda")
 ```
 
 Now the transition matrix has been serialized and saved as a file named `model.rds`. To load the object into R's environment execute the following command:
 
 ```{r, eval = FALSE}
-model <- readRDS(mod, "./data/model.rds")
+read(file = "./data/model.rda")
 ```
 
-That's how we're going to load our model in the ShinyApp.
+An object named `model` should be added to the environment. That's how we're going to load our model in the app.
+
+Depending on the environment where the app will be deployed, there will different limits for memory and resources.
+
+Given that we are computing the transition matrix (model) probabilities before hand we are somewhat shielded from performance issues (the app using the model
+doesn't have to perform any computation, only retrieve the top word predictions to return), but we still might have limitations regarding the biggest model that we can fit into the available memory.
 
 ## Results
 
@@ -1195,6 +1200,6 @@ The model is a transition matrix with size ($\text{Number of History N-Grams} \t
 
 We are going to smooth probabilities using Good-Turing estimation.
 
-We are going to evaluate our model by calculating the model's perplexity.
+We are going to evaluate our model by calculating perplexity.
 
 We are going to use Katz's Back-off to estimate the probability of unobserved n-grams.

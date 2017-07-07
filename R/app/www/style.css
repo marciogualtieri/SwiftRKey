@@ -1,6 +1,7 @@
 table { display: block;
-        overflow-x: auto; 
+        overflow-x: auto;
         max-height:400px;
+        width: 100% !important;
         overflow-y: auto;
 }
 
