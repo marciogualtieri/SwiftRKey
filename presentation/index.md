@@ -83,7 +83,7 @@ suggestions(model, "new", n = 2, with_probabilities = TRUE)
 ## [1] "jersey"
 ```
 
-For more details refer to the [R package project](../model).
+For more details refer to the [R package project](https://github.com/marciogualtieri/SwiftRKey/R/model).
 
 ---
 
@@ -105,7 +105,7 @@ The app illustrates how the text prediction model can be easily incorporated int
 </p>
 
 <p>
-You will find more details in <a href = "../app">the app's documentation</a> and you may also demo the app <a href="https://marciogualtieri.shinyapps.io/swiftrkey/">here</a>.
+You will find more details in <a href = "https://github.com/marciogualtieri/SwiftRKey/R/app">the app's documentation</a> and you may also demo the app <a href="https://marciogualtieri.shinyapps.io/swiftrkey/">here</a>.
 </p>
 
 <p>
