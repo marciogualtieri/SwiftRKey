@@ -83,7 +83,7 @@ suggestions(model, "new", n = 2, with_probabilities = TRUE)
 ## [1] "jersey"
 ```
 
-For more details refer to the [R package project](https://github.com/marciogualtieri/SwiftRKey/tree/master/R/master).
+For more details refer to the [R package project](https://github.com/marciogualtieri/SwiftRKey/tree/master/R/model).
 
 ---
 
