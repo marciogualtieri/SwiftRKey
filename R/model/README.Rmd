@@ -2,17 +2,18 @@
 title: 'SwitftRKey: A typing prediction app written in R'
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
-  html_document:
-    toc: yes
-    toc_depth: 6
   md_document:
     df_print: kable
     toc: yes
     toc_depth: 6
     variant: markdown_github
+  html_document:
+    toc: yes
+    toc_depth: 6
 ---
 
-# `swiftrkey` R Package
+<center><h1>SwitftRKey: The Text Typing Prediction Library</h1></center>
+<br/>
 
 ## Overview
 

@@ -2,20 +2,22 @@
 title: 'SwitftRKey: A typing prediction app written in R'
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
-  md_document:
-    df_print: kable
-    toc: yes
-    toc_depth: 6
-    variant: markdown_github
   html_document:
     css: ./www/style.css
     df_print: kable
     self_contained: no
     toc: yes
     toc_depth: 6
+  md_document:
+    df_print: kable
+    toc: yes
+    toc_depth: 6
+    variant: markdown_github
 ---
 
-# SwitftRKey
+<center><h1>SwitftRKey: The Text Typing Prediction App</h1></center>
+
+<br/>
 
 <p align="center"><img alt="SwiftRKey" src="images/swiftrkeylogo.png" /></p>
 
@@ -27,7 +29,7 @@ The purpose of this app, which has been developed with the [Shiny Framework](htt
 
 A demo of the SwiftRKey app can be found [here](https://marciogualtieri.shinyapps.io/swiftrkey/). It's important to note that the app has been deployed to [shinyapps.io](https://shinyapps.io) with a free account, thus there is a limit of 1Gb of memory, which somewhat restricts how sophisticated the application can be. I will detail its features in the sections that will follow.
 
-For easy deployment, the model has been packaged as [a R library](../model) which can be easily reused in other Shiny applications or even in a R notebook.
+For easy deployment, the model has been packaged as [a R package](../model) which can be easily reused in other Shiny applications or even in a R notebook.
 
 ## Shiny Application
 

@@ -1,21 +1,24 @@
--   [SwitftRKey](#switftrkey)
-    -   [Overview](#overview)
-    -   [Shiny Application](#shiny-application)
-        -   [User Guide](#user-guide)
-            -   [Keyboard](#keyboard)
-            -   [Dashboard](#dashboard)
-                -   [Statistics](#statistics)
-                -   [Frequency Plots](#frequency-plots)
-        -   [Developer Guide](#developer-guide)
-            -   [Architecture](#architecture)
-            -   [Source Files](#source-files)
-        -   [How to Deploy the App](#how-to-deploy-the-app)
-    -   [Prediction Model](#prediction-model)
-        -   [How to Deploy the Model](#how-to-deploy-the-model)
-        -   [Example of Use](#example-of-use)
+-   [Overview](#overview)
+-   [Shiny Application](#shiny-application)
+    -   [User Guide](#user-guide)
+        -   [Keyboard](#keyboard)
+        -   [Dashboard](#dashboard)
+            -   [Statistics](#statistics)
+            -   [Frequency Plots](#frequency-plots)
+    -   [Developer Guide](#developer-guide)
+        -   [Architecture](#architecture)
+        -   [Source Files](#source-files)
+    -   [How to Deploy the App](#how-to-deploy-the-app)
+-   [Prediction Model](#prediction-model)
+    -   [How to Deploy the Model](#how-to-deploy-the-model)
+    -   [Example of Use](#example-of-use)
 
-SwitftRKey
-==========
+<center>
+<h1>
+SwitftRKey: The Text Typing Prediction App
+</h1>
+</center>
+<br/>
 
 <p align="center">
 <img alt="SwiftRKey" src="images/swiftrkeylogo.png" />
@@ -29,7 +32,7 @@ The purpose of this app, which has been developed with the [Shiny Framework](htt
 
 A demo of the SwiftRKey app can be found [here](https://marciogualtieri.shinyapps.io/swiftrkey/). It's important to note that the app has been deployed to [shinyapps.io](https://shinyapps.io) with a free account, thus there is a limit of 1Gb of memory, which somewhat restricts how sophisticated the application can be. I will detail its features in the sections that will follow.
 
-For easy deployment, the model has been packaged as [a R library](../model) which can be easily reused in other Shiny applications or even in a R notebook.
+For easy deployment, the model has been packaged as [a R package](../model) which can be easily reused in other Shiny applications or even in a R notebook.
 
 Shiny Application
 -----------------

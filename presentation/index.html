@@ -1,0 +1,156 @@
+<!DOCTYPE HTML>
+<!--[if IE 6]>
+<html id="ie6" lang="en-US" class="ie ie6 lt-ie9">
+<![endif]-->
+<!--[if IE 7]>
+<html id="ie7" lang="en-US" class="ie ie7 lt-ie9">
+<![endif]-->
+<!--[if IE 8]>
+<html id="ie8" lang="en-US" class="ie ie8 lt-ie9">
+<![endif]-->
+<!--[if gte IE 9]>
+<html lang="en-US" class="ie ie9">
+<![endif]-->
+<!--[if !(IE)]><!-->
+<html lang="en-US" class="">
+<head>
+  <title>SwitftRKey: A typing prediction app written in R</title>
+  <link rel="stylesheet" href="libraries/frameworks/flowtime/assets/css/reset.css">
+  <link rel="stylesheet" href="libraries/frameworks/flowtime/css/flowtime.css">
+  <link rel="stylesheet" href="libraries/frameworks/flowtime/css/themes/default.css">
+  <link rel="stylesheet" href="libraries/frameworks/flowtime/assets/css/prism.css">
+  <link rel="stylesheet" href="libraries/highlighters/highlight.js/css/tomorrow.css">  <link rel="stylesheet" href = "assets/css/ribbons.css">
+
+</head>
+<body>
+  <div class="flowtime">
+    <div class="ft-section " data-id="section-1">
+<div class="ft-page " data-title="">
+  <p><center><h2>SwitftRKey</h2></center>
+<center><h3>A Typing Prediction App Written in R</h3></center>
+<center><img src="images/swiftrkeylogo.png" alt="SwitftRKey Logo"></center>
+<center><h4>By Marcio Gualtieri</h4></center>
+<center><h4>July 24, 2017</h4></center></p>
+		
+</div>
+</div>
+<div class="ft-section " data-id="section-2">
+<div class="ft-page " data-title="">
+  <h3>Why Is Text Typing Prediction Useful?</h3>
+
+<p><img src="./images/stephen_hawking.png"
+     alt="Stephen Hawking and SwiftKey staff"
+     align="left"/></p>
+
+<p>
+The continued affordability and popularity of smart phones and other mobile devices pushed the advent of keyboard typing prediction.
+</p>
+
+<p>
+Mobile devices are in general too small to fit a confortable size keyboard, making typing unpleasant.
+</p>
+
+<p>
+This technology goes beyond providing a product to sell though: Professor Hawking's medical condition, amyotrophic lateral sclerosis (ALS), <a href = "https://blog.swiftkey.com/swiftkey-reveals-role-professor-stephen-hawkings-communication-system/"> makes text prediction critical to improve his daily live</a>.
+</p>
+
+<p>
+A truly noble and remarkable use of technology which can have a positive impact in the lives of many other people with disabilities.
+</p>
+		
+</div>
+</div>
+<div class="ft-section " data-id="section-3">
+<div class="ft-page " data-title="">
+  <h3>How Does the Prediction Model Work?</h3>
+
+<p>The model is represented by a Markov transition matrix, where each cell contains the probability of a word given a history of words. The model has been encapsulated inside a package named <code>swiftrkey</code> together with the necessary supporting code:</p>
+
+<pre><code class="r">suppressMessages(library(swiftrkey))
+model[10:12, 1:3]
+</code></pre>
+
+<pre><code>##             &lt;unknown&gt;           s        said
+## s &lt;unknown&gt; 1.0000000 0.086842105 0.037463482
+## time        0.5070423 0.004030154 0.001649295
+## u           0.2142857 1.000000000 0.001649295
+</code></pre>
+
+<p>Above, a partial view of the transition matrix&#39;s content. Each cell represents the probability of a word (each column) given a certain history of words (each row). For instance, given the row (history) &quot;time&quot;, there is a 0.004030154 probability that the next word is &quot;s&quot;.</p>
+		
+</div>
+</div>
+<div class="ft-section " data-id="section-4">
+<div class="ft-page " data-title="">
+  <p>Note that the history could be empty (first row) and that our model supports unknown words. Any word that isn&#39;t present in the model is treated as it was &quot;&lt;unknown&gt;&quot;.</p>
+
+<p>The probabilities have been calculated using Katz&#39;s Backoff. For more details refer to the <a href="https://marciogualtieri.github.io/SwiftRKey/R/notebook/swiftrkey.html">R notebook</a>.</p>
+
+<p>You may easily deploy the model to your Shiny application or notebook by loading the library, and get suggestions by using the included supporting code:</p>
+
+<pre><code class="r">suggestions(model, &quot;new&quot;, n = 2, with_probabilities = TRUE)
+</code></pre>
+
+<pre><code>## $`0.579710144927536`
+## [1] &quot;york&quot;
+## 
+## $`0.247427011132115`
+## [1] &quot;jersey&quot;
+</code></pre>
+
+<p>For more details refer to the <a href="../model">R package project</a>.</p>
+		
+</div>
+</div>
+<div class="ft-section " data-id="section-5">
+<div class="ft-page " data-title="">
+  <h3>The SwiftRKey App</h3>
+
+<p>The app (developed with the <a href="https://shiny.rstudio.com/">Shiny Framework</a>) is comprised of a keyboard and a dashboard with statistics on the app&#39;s usage.</p>
+
+<p><img src="./images/app.png"
+     alt="SwiftRKey App"
+     align="left"/></p>
+
+<p>
+The metrics include measurements such as keystrokes saved by accepting suggestions, time saved not typing, a frequency barplot and a word cloud diagram to show the most popular words typed so far.
+</p>
+
+<p>
+The app illustrates how the text prediction model can be easily incorporated into a useful app.
+</p>
+
+<p>
+You will find more details in <a href = "../app">the app's documentation</a> and you may also demo the app on <a href="https://marciogualtieri.shinyapps.io/swiftrkey/">shinyapps.io</a>.
+</p>
+
+<p>
+<center><h3>THE END</h3></center>
+</p>
+		
+</div>
+</div>
+  </div>
+</body>
+  <script src="libraries/frameworks/flowtime/js/brav1toolbox.js"></script>
+  <script src="libraries/frameworks/flowtime/js/flowtime.js"></script>
+	<script src="libraries/frameworks/flowtime/assets/js/prism.js"></script>
+  <!-- LOAD HIGHLIGHTER JS FILES -->
+  <script src="libraries/highlighters/highlight.js/highlight.pack.js"></script>
+  <script>hljs.initHighlightingOnLoad();</script>
+  <!-- DONE LOADING HIGHLIGHTER JS FILES -->
+   
+    <script>
+    // Configuration API test
+		Flowtime.showProgress(true);
+		// Flowtime.fragmentsOnSide(true);
+		// Flowtime.fragmentsOnBack(true);
+		// Flowtime.useHistory(false);
+		// Flowtime.slideInPx(true);
+		// Flowtime.sectionsSlideToTop(true);
+		// Flowtime.gridNavigation(false);
+		// Flowtime.useOverviewVariant(true);
+		Flowtime.parallaxInPx(true);
+    Flowtime.start();
+  </script>
+</html>

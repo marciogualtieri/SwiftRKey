@@ -1,16 +1,19 @@
--   [`swiftrkey` R Package](#swiftrkey-r-package)
-    -   [Overview](#overview)
-    -   [Installation Instructions](#installation-instructions)
-    -   [Usage](#usage)
-        -   [Examples of Usage](#examples-of-usage)
-    -   [Developer Guide](#developer-guide)
-        -   [Setup](#setup)
-        -   [Load the Libraries](#load-the-libraries)
-        -   [Create the Package Directory](#create-the-package-directory)
-        -   [Build & Reload Package](#build-reload-package)
+-   [Overview](#overview)
+-   [Installation Instructions](#installation-instructions)
+-   [Usage](#usage)
+    -   [Examples of Usage](#examples-of-usage)
+-   [Developer Guide](#developer-guide)
+    -   [Setup](#setup)
+    -   [Load the Libraries](#load-the-libraries)
+    -   [Create the Package Directory](#create-the-package-directory)
+    -   [Build & Reload Package](#build-reload-package)
 
-`swiftrkey` R Package
-=====================
+<center>
+<h1>
+SwitftRKey: The Text Typing Prediction Library
+</h1>
+</center>
+<br/>
 
 Overview
 --------
