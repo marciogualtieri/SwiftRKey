@@ -16,5 +16,5 @@ You should probably navigate this project in the following order:
 
 - Model Usage: Check the [R library that encapsulates the prediction algorithm](./R/model).
 
-**TL;DR:** There's a slidify presentation available [here](https://marciogualtieri.github.io/SwiftRKey/presentation/index.html) if you're looking for a very high level overview.
+**TL;DR:** if you're looking for a very high level overview, there's a slidify presentation available [here](https://marciogualtieri.github.io/SwiftRKey/presentation/index.html).
 
