@@ -1,4 +1,4 @@
-# SwitftRKey: A typing prediction app written in R
+# SwitftRKey: A typing Prediction App Written in R
 
 <p align="center"><img alt="SwiftRKey" src="presentation/images/swiftrkeylogo.png" /></p>
 
