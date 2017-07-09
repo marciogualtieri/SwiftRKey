@@ -80,7 +80,7 @@ The app (developed with the [Shiny Framework](https://shiny.rstudio.com/)) is co
      align="left"/>
 
 <p>
-The metrics include measurements such as keystrokes saved by accepting suggestions, time saved not typing, a frequency barplot and a word cloud diagram to show the most popular words typed so far.
+The metrics include measurements such as keystrokes avoided by accepting suggestions, time saved by avoiding keystrokes, a frequency barplot and a word cloud diagram to show the most popular words typed so far.
 </p>
 
 <p>

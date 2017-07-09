@@ -1,5 +1,7 @@
 # SwitftRKey: A Typing Prediction App Written in R
 
+<br/>
+
 <p align="center"><img alt="SwiftRKey" src="presentation/images/swiftrkeylogo.png" /></p>
 
 <br/>
@@ -16,5 +18,5 @@ You should probably navigate this project in the following order:
 
 - Model Usage: Check the [R library that encapsulates the prediction algorithm](./R/model).
 
-**TL;DR:** if you're looking for a very high level overview, there's a slidify presentation available [here](https://marciogualtieri.github.io/SwiftRKey/presentation/index.html).
+> **TL;DR:** if you're looking for a very high level overview, a [slidify presentation](https://marciogualtieri.github.io/SwiftRKey/presentation/index.html) is available.
 
