@@ -1,5 +1,9 @@
-data
-swiftrkey_cache
-.Rproj.user
-.Rcache
+.RData
 .Rhistory
+<<<<<<< HEAD
+=======
+.Rcache
+.Rproj.user
+*_cache
+/presentation/.cache/
+>>>>>>> 6f959ab06ff943bbe280a4be58d6190bded4d6a3

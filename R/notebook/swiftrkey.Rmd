@@ -1,17 +1,16 @@
----
-title: "SwitftRKey: A typing prediction app written in R"
+title: 'SwitftRKey: A typing prediction app written in R'
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
-  html_document:
-    css: ./styles/style.css
-    df_print: kable
-    toc: yes
-    toc_depth: 6
   md_document:
     df_print: kable
     toc: yes
     toc_depth: 6
     variant: markdown_github
+  html_document:
+    css: ./styles/style.css
+    df_print: kable
+    toc: yes
+    toc_depth: 6
 ---
 
 ## Installing Dependencies
@@ -294,7 +293,7 @@ load_curse_words <- function(curse_words_url) {
     connection <- url(curse_words_url)
     lines <- readLines(connection)
     close(connection)
-    stemDocument(lines)
+    lines
 }
 
 curse_words <- load_curse_words(
@@ -1193,6 +1192,6 @@ The model is a transition matrix with size ($\text{Number of History N-Grams} \t
 
 We are going to smooth probabilities using Good-Turing estimation.
 
-We are going to evaluate our model by calculating the model's perplexity.
+We are going to evaluate our model by calculating perplexity.
 
 We are going to use Katz's Back-off to estimate the probability of unobserved n-grams.
