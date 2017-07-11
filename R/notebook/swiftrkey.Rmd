@@ -54,7 +54,6 @@ install.packages("data.table")
 install.packages("wordnet")
 install.packages("pacman")
 install.packages("markovchain")
-install.packages("edgeR")
 install.packages("R.cache")
 ```
 
@@ -84,7 +83,6 @@ suppressMessages(library(pacman))
 p_load_gh('hrbrmstr/pluralize')
 p_load(quanteda)
 suppressMessages(library(markovchain))
-suppressMessages(library(edgeR))
 suppressMessages(library(R.cache))
 ```
 
@@ -241,7 +239,7 @@ create_sample_files <- function(input_dir, output_dir, sample_fraction, test_fra
                       test_fraction = test_fraction))
 }
 
-create_sample_files("./data/final/en_US", "./data/samples", 0.005, 0.3)
+create_sample_files("./data/final/en_US", "./data/samples", 0.01, 0.3)
 ```
 
 We are going to take 0.1% of the sentences inside each file in the directory. I have verified by trial and error that this amount is sufficient to see the patterns we need to see.
@@ -1160,16 +1158,16 @@ perplexity(2:4, model, test_data)
 ### Saving the Model to Disk
 
 ```{r}
-saveRDS(model, "./data/model.rds")
+save(model, file = "./data/model.rda")
 ```
 
 Now the transition matrix has been serialized and saved as a file named `model.rds`. To load the object into R's environment execute the following command:
 
 ```{r, eval = FALSE}
-model <- readRDS(mod, "./data/model.rds")
+read(file = "./data/model.rda")
 ```
 
-That's how we're going to load our model in the ShinyApp.
+This command will load the object named `model` into the R environment.
 
 ## Results
 
