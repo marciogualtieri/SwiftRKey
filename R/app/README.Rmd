@@ -159,6 +159,9 @@ In short, whatever code you put inside `ShinyUI()` is a view and whatever code y
 Before you can deploy to shinyapps.io, you need to set your account info:
 
 ```{r, eval = FALSE}
+install.packages("rsconnect")
+library(rsconnect)
+
 rsconnect::setAccountInfo(name='<USERNAME>',
                           token='<TOKEN>',
                           secret='<SECRET>')
