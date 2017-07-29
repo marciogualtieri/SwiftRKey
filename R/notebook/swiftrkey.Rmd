@@ -1,16 +1,17 @@
+---
 title: 'SwitftRKey: A typing prediction app written in R'
 author: "Marcio Gualtieri (marcio dot gualtieri at gmail dot com)"
 output:
-  md_document:
-    df_print: kable
-    toc: yes
-    toc_depth: 6
-    variant: markdown_github
   html_document:
     css: ./styles/style.css
     df_print: kable
     toc: yes
     toc_depth: 6
+  md_document:
+    df_print: kable
+    toc: yes
+    toc_depth: 6
+    variant: markdown_github
 ---
 
 ## Installing Dependencies
@@ -29,7 +30,7 @@ Follow the instructions for Linux:
 
     sudo apt-get install libv8-dev
 
-This library is required by the [pluralize" package](https://github.com/hrbrmstr/pluralize).
+This library is required by the [pluralize package](https://github.com/hrbrmstr/pluralize).
 
 ## Installing the Required Packages
 
@@ -85,7 +86,7 @@ suppressMessages(library(markovchain))
 suppressMessages(library(R.cache))
 ```
 
-Wordnet also requires the following setup:
+Wordnet also requires the following setup (Linux):
 
 ```{r}
 Sys.setenv(WNHOME = "/usr/bin/wordnet")
@@ -117,7 +118,7 @@ set.seed(123)
 
 ## Synopsis
 
-The objectives of this notebook are basic data cleaning, exploratory data analysis and model design for a keyboard typing predicting app, (i.e., capable of predicting what's the next word given the currently typed words).
+The objectives of this notebook are basic data cleaning, exploratory data analysis and model design and generation for a keyboard typing predicting app, i.e., capable of predicting what's the next word given the currently typed words.
 
 We are going to start by using some of R's text-mining packages to find some basic patterns in a corpus of English text, e.g., what's the distribution of words, what are the relationships between words in sentences, etc.
 
@@ -128,29 +129,11 @@ Our work-horse is going to be the [tm](http://tm.r-forge.r-project.org/) package
 - [textcat](https://www.rdocumentation.org/packages/textcat/versions/1.0-4)
 - [qdap](https://github.com/trinker/qdap)
 
-The next step is going to be the creation of a R script to produce and save to disk an improved model of the same design (spoiler: the model consists of a transition matrix which represents a [Markov process](https://en.wikipedia.org/wiki/Markov_chain)). The model produced in this notebook is only a proof of concept to verify design choices. In a bare bones R script (without exploratory data analysis code) we can better utilize the available resources (memory and CPU) and work with a larger corpus of text to improve our probability estimates.
+The final prediction model consists of a transition matrix (which represents a [Markov process](https://en.wikipedia.org/wiki/Markov_chain)) that can be easily imported into a R app or notebook.
 
 ## Data Processing
 
 ### Downloading the Data-set
-
-```{r}
-download_zipped_data <- function(url, destination) {
-  temp_file <- tempfile()
-  download.file(url, temp_file)
-  unzip(zipfile = temp_file, exdir = destination)
-  unlink(temp_file)
-}
-
-download_zipped_data("https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip",
-                     "./data")
-```
-
-### Data-set's Files
-
-```{r}
-list.files(path = "./data", recursive = TRUE)
-```
 
 There seem to be three different categories of text ("blogs", "news" and "twitter") for four different languages (German, English, finnish and Russian).
 
@@ -181,7 +164,7 @@ file_head("./data/final/en_US/en_US.twitter.txt")
 
 Helps to get some basic metadata on the files we are working with:
 
-```{r}
+```{r, results="asis"}
 file_size <- function(name)
     suppressWarnings(utils:::format.object_size(file.info(name)[["size"]], "auto"))
 
@@ -238,7 +221,7 @@ create_sample_files <- function(input_dir, output_dir, sample_fraction, test_fra
                       test_fraction = test_fraction))
 }
 
-create_sample_files("./data/final/en_US", "./data/samples", 0.01, 0.3)
+create_sample_files("./data/final/en_US", "./data/samples", 0.001, 0.3)
 ```
 
 We are going to take 0.1% of the sentences inside each file in the directory. I have verified by trial and error that this amount is sufficient to see the patterns we need to see.
@@ -265,7 +248,6 @@ clean_corpus <- function(corpus) {
     corpus <- tm_map(corpus, replacePunctuation)
     corpus <- tm_map(corpus, removeNumbers)
     corpus <- tm_map(corpus, content_transformer(tolower))
-    corpus <- tm_map(corpus, removeWords, stopwords("english"))
     corpus
 }
 
@@ -275,6 +257,8 @@ corpus <- clean_corpus(corpus)
 I'm not using tm's default `removePunctuation()` though, because it would remove apostrophes, e.g., "we're" would become "were".
 
 Contractions are not single words: e.g., "we're" and "doesn't" are actually "we are" and "does not". Thus, apostrophes should be considered delimiter characters (like whitespaces).
+
+Also note that I'm not removing stop words. In general, if we were working with feature extraction (for machine learning), we would do that, but given that stop words are relevant for predicting text typing in natural languages, we must keep them.
 
 #### Stemming
 
@@ -303,11 +287,23 @@ curse_words <- load_curse_words(
 corpus_without_curse_words <- tm_map(corpus, removeWords, curse_words)
 ```
 
+I'm going to extract the corpus generation code to a function for easier use:
+
+```{r}
+create_corpus <- function(data_dir) {
+  corpus <- VCorpus(DirSource(data_dir), readerControl = list(language = "en_US"))
+  corpus <- clean_corpus(corpus)
+  tm_map(corpus, removeWords, curse_words)
+}
+```
+
+I'm going to resample a larger fraction of the data later for use in the prediction model generation.
+
 ## Exploratory Data Analysis
 
 ### Distribution of N-Grams of Size from One to Four Words
 
-```{r}
+```{r, results="asis"}
 create_ngrams_data_frame <- function(document_term_matrix) {
   frequencies <- colSums(document_term_matrix)
   ngrams <- data.frame(ngram = names(frequencies), frequency = frequencies, stringsAsFactors = FALSE)
@@ -361,7 +357,7 @@ words_cloud(top_one_grams)
 
 ### Distribution of N-Grams of Size Two Words
 
-```{r}
+```{r, results="asis"}
 two_ngram_tokenizer <- function(x) 
   NGramTokenizer(x, Weka_control(min = 2, max = 2))
 
@@ -389,7 +385,7 @@ words_cloud(top_two_ngrams)
 
 ### Distribution of N-Grams of Size Three Words
 
-```{r}
+```{r, results="asis"}
 three_ngram_tokenizer <- function(x) 
   NGramTokenizer(x, Weka_control(min = 3, max = 3))
 
@@ -417,7 +413,7 @@ words_cloud(top_three_ngrams)
 
 You are going to need N-Grams with size 4 as well for the model, but I'm not going to plot their frequencies:
 
-```{r}
+```{r, results="asis"}
 four_gram_tokenizer <- function(x) 
   NGramTokenizer(x, Weka_control(min = 4, max = 4))
 
@@ -435,7 +431,7 @@ How Many of the top words are required to cover a given percentage of words pres
 
 We are going to answer this question by finding out how the number of words covered in the data-set increases as we add words from the most frequent to the least frequent:
 
-```{r}
+```{r, results="asis"}
 words_coverage <- data.frame(
     coverage = round(cumsum(one_grams$frequency) / sum(one_grams$frequency) * 100, 2),
     words = 1:nrow(one_grams)
@@ -515,7 +511,7 @@ names(sub_tc_byte_profiles)
 
 You may then use these profiles for detection:
 
-```{r}
+```{r, results="asis"}
 language_dt <- one_ngrams_dt[, language := textcat(ngram, p = sub_tc_byte_profiles)]
 language_aggregated_dt <- language_dt[, sum(frequency), by = language]
 names(language_aggregated_dt) <- c("language", "frequency")
@@ -525,7 +521,7 @@ as.data.frame(language_aggregated_dt)
 
 Looking at the classification for each word, it seems like textcat's accuracy leaves to desire quite a bit:
 
-```{r}
+```{r, results="asis"}
 language_dt[1:10, ]
 ```
 
@@ -535,22 +531,27 @@ Thus, I decided to experiment with a different method, which follows in the next
 
 The following function uses the wordnet package to determine if a word belongs to the English language:
 
-```{r, eval = FALSE}
+```{r, results="asis"}
 synonyms_found <- function(word, pos)
     length(synonyms(word, pos)) > 0
 
 vectorized_synonyms <- function(words, pos)
     sapply(words, synonyms_found, pos = pos)
 
-is_english <- function(input_word) {
+stopWords <- stopwords("english")
+
+is_stop_word <- function(input_word)
+  input_word %in% stopWords
+
+is_english_word <- function(input_word) {
     test_adjective <- vectorized_synonyms(word = singularize(input_word), "ADJECTIVE")
     test_adverb <- vectorized_synonyms(word = singularize(input_word), "ADVERB")
     test_noun <- vectorized_synonyms(word = singularize(input_word), "NOUN")
     test_verb <- vectorized_synonyms(word = singularize(input_word), "VERB")
-    test_adjective | test_adverb | test_noun | test_verb
+    test_adjective | test_adverb | test_noun | test_verb | is_stop_word(input_word)
 }
 
-is_english_dt <- one_ngrams_dt[, is_english := is_english(ngram)]
+is_english_dt <- one_ngrams_dt[, is_english := is_english_word(ngram)]
 is_english_aggregated_dt <- is_english_dt[, sum(frequency), by = is_english]
 names(is_english_aggregated_dt) <- c("is_english", "frequency")
 is_english_aggregated_dt <- is_english_aggregated_dt[, percentage := round(frequency / sum(language_dt[, 2]) * 100, 2)]
@@ -559,11 +560,18 @@ as.data.frame(is_english_aggregated_dt)
 
 These numbers seem more reasonable, as well as the classification for each word:
 
-```{r, eval = FALSE}
-is_english_dt[1:12, ]
+```{r, results="asis"}
+as.data.frame(is_english_dt[1:12, ])
 ```
 
 ## Prediction Model
+
+0.1% of the data was enough to find patterns in the data, but to generate the model, I'm going to increase the amonunt of data:
+
+```{r}
+create_sample_files("./data/final/en_US", "./data/samples", 0.002, 0.3)
+corpus_without_curse_words <- create_corpus("./data/samples/training")
+```
 
 ### Unknown Words
 
@@ -583,7 +591,7 @@ add_unknown_words <- function(corpus) {
         document_index <- which.max(tm_index(corpus, FUN = function(x) any(grep(paste0("\\b", word,"\\b"), content(x)))))
         line_index <- which.max(grepl(paste0("\\b", word, "\\b"), content(corpus[[document_index]])))
         content(corpus[[document_index]])[line_index] <-
-            sub(paste0("\\b", word, "\\b"), "<UNKNOWN>",
+            sub(paste0("\\b", word, "\\b"), "<unknown>",
                 content(corpus[[document_index]])[line_index])
 
         counter <- counter + 1
@@ -640,9 +648,9 @@ $$
 
 After consulting multiple resources over the web, I couldn't find a clear example of its use. For these reason, I have decided to put a full example of how to compute the probabilities for this model in this notebook (for future reference).
 
-We are going to show the calculation steps for the example: $P_{bo}(\text{"word"}|\text{"bird is the"})$.
+I'm going to show the calculation steps for the example: $P_{bo}(\text{"word"}|\text{"bird is the"})$.
 
-#### Example Without Back-off
+##### Example Without Back-off
 
 Let's start with the simplest case, suppose further that $C(\text{"bird is the word"}) > k$. In the case:
 
@@ -658,7 +666,7 @@ $$
 
 Where $n_x$ is the number of n-grams that occured in the corpus exactly $x$ times.
 
-#### Example With a Single Back-off
+##### Example With a Single Back-off
 
 Let's start with the simplest case, suppose further that $C(\text{"bird is the word"}) \leq k$. In the case:
 
@@ -666,7 +674,7 @@ $$
 P_{bo}(\text{"word"}|\text{"is the word"}) = \alpha_{\text{"bird is the"}} P_{bo}(\text{"word"} | \text{"is the"})
 $$
 
-Supposing that $C(\text{"is the word"}) \leq k$, we already know how to calculate that (previous section).
+Supposing that $C(\text{"is the word"}) \leq k$, I already know how to calculate that (previous section).
 
 
 $$
@@ -699,12 +707,12 @@ You will find this formula on Katz's original paper (formula (3)).
 
 ##### Map of Frequencies
 
-We are going to need a sub-set of n-grams of different sizes. I'm creating a function to generate an amalgate of n-grams with different sizes from the individual n-gram data-sets:
+I'm going to need a sub-set of n-grams of different sizes. I'm creating a function to generate an amalgate of n-grams with different sizes from the individual n-gram data-sets:
 
-```{r}
+```{r, results="asis"}
 create_frequencies <- function(corpus, min_count) {
     one_to_four_gram_tokenizer <- function(x) 
-        NGramTokenizer(x, Weka_control(min = 1, max = 4))
+        NGramTokenizer(x, Weka_control(min = 1, max = 8))
     document_term_matrix <- DocumentTermMatrix(corpus,
                                                control = list(tokenize = one_to_four_gram_tokenizer,
                                                               wordLengths=c(1, Inf)))
@@ -720,7 +728,7 @@ sample_n(frequencies_dt, 12)
 
 I'm going to pre-process the table of frequencies to speed-up computation by creating a column for "history" (tokens preceding the last token) and "word" (last token):
 
-```{r}
+```{r, results="asis"}
 extract_history <- function(ngram){
     ifelse(length(ngram) > 1,
            paste(ngram[1:(length(ngram)-1)], collapse = " "),
@@ -731,12 +739,13 @@ extract_history <- function(ngram){
 extract_word <- function(ngram) paste(ngram[length(ngram)], collapse = " ")
 
 build_processed_ngram_frequencies <- function(frequencies_dt) {
-    data_dt <- data.table(frequencies_dt)
-    data_dt[, ngram := strsplit(ngram, split = " |'")]
-    data_dt[, ngram_length := sapply(ngram, length)]
-    data_dt[, history := sapply(ngram, extract_history)]
-    data_dt[, word := sapply(ngram, extract_word)]
-    data_dt[, ngram := sapply(ngram, paste, collapse = " ")]
+    data <- as.data.frame(frequencies_dt)
+    data$ngram <- strsplit(data$ngram, split = " |'")
+    data$ngram_length <- sapply(data$ngram, length)
+    data$history <- sapply(data$ngram, extract_history)
+    data$word <- sapply(data$ngram, extract_word)
+    data$ngram <- sapply(data$ngram, paste, collapse = " ")
+    data.table(data)
 }
 
 ngram_frequencies_dt <- build_processed_ngram_frequencies(frequencies_dt)
@@ -745,7 +754,7 @@ as.data.frame(ngram_frequencies_dt[ngram_length > 1, ][order(-frequency), ][1:50
 
 Computing probabilities for the model will require counts for histories as well, so let's create a data table specifically for this purpose:
 
-```{r}
+```{r, results="asis"}
 history_frequencies_dt <-
     ngram_frequencies_dt[, c("history", "frequency")][, lapply(.SD, sum), by = list(history)]
 
@@ -928,13 +937,13 @@ katz_alpha("didn", 5, ngram_frequencies_dt, history_frequencies_dt, frequencies_
 katz_probability("s", "didn", 5, ngram_frequencies_dt, history_frequencies_dt, frequencies_of_frequencies)
 ```
 
-Given that $\beta_i$ and $\sum_{i} \alpha_i$ are probabilities, they need to be smaller or equal to one. In practice though, we are working with estimates obtained from the text corpus and estimations will be as good as our data, thus the calculations might result in values greater than one.
+Given that $\beta_i$ and $\sum_{i} \alpha_i$ are probabilities, they need to be smaller or equal to one. In practice though, I'm working with estimates obtained from the text corpus and estimations will be as good as our data, thus the calculations might result in values greater than one.
 
-Another issue is that computers introduce rounding errors. For this reason, we are limiting the value of $\alpha_i$ and $\beta_i$ to one, that is, if the estimate $\alpha_i$ and $\beta_i$ exceeds one, we assume they are actually equal to one.
+Another issue is that computers introduce rounding errors. For this reason, I'm limiting the value of $\alpha_i$ and $\beta_i$ to one, that is, if the estimate $\alpha_i$ and $\beta_i$ exceeds one, I assume they are actually equal to one.
 
 #### Computing a Markov Chain Trainsition Matrix
 
-Now that we can compute Katz's probabilities, we will create a transition matrix, which is a representation of a [Markov Chain](https://en.wikipedia.org/wiki/Markov_chain):
+Now that I can compute Katz's probabilities, I will create a transition matrix, which is a representation of a [Markov Chain](https://en.wikipedia.org/wiki/Markov_chain):
 
 ```{r}
 create_transition_matrix <- function(k,
@@ -1005,7 +1014,7 @@ which(is.na(model), arr.ind = TRUE)
 
 All rows are in the range value for probabilities and there aren't any NAs.
 
-Given that we are going to ultimately load the model into memory in the keyboard typing prediction app and that shinyapps.io has a limitation (for the free account) of 1GB, let's also take a look at the model's size
+Given that I'm going to ultimately load the model into memory in the keyboard typing prediction app and that shinyapps.io has a limitation (for the free account) of 1GB, let's also take a look at the model's size
 
 ```{r}
 object.size(model)
@@ -1075,14 +1084,14 @@ suggestions(model, "next")
 
 
 ```{r}
-suggestions(model, "new")
+suggestions(model, "live and I d", n = 20)
 ```
 
-The suggestions make sense, so it seems like we are in good shape. In the next section, we are going to evaluate how good our model is in a more quantitative manner.
+The suggestions make sense, so it seems like I'm in good shape. In the next section, I'm going to evaluate how good our model is in a more quantitative manner.
 
 ### Model Perplexity
 
-We are going to use [perplexity](https://en.wikipedia.org/wiki/Perplexity) as a measure for model performance:
+I'm going to use [perplexity](https://en.wikipedia.org/wiki/Perplexity) as a measure for model performance:
 
 $$
 2^H = 2^{- \frac{1}{L - m +1} \sum_{l = m}^{L} log_2 P(w_i|w_{l - m + 1}^{l - 1})}
@@ -1090,7 +1099,7 @@ $$
 
 Where: $w_i$ is the test word sequence and $m$ is the N-Gram size. Given that $m + 1 \ll L$ and our model has N-Grams of multiple sizes, I'm going to ignore $m + 1$ in the denominator.
 
-First we would need a function to extract conditional probabilities from the model:
+First I need a function to extract conditional probabilities from the model:
 
 ```{r}
 model_probability <- function(model, word, history) {
@@ -1107,17 +1116,15 @@ model_probability(model, "<gibberish>", "didn")
 model_probability(model, "back", "")
 ```
 
-We are going to sample again from the corpus and create a test corpus:
+I'm going to sample again from the corpus and create a test corpus:
 
-```{r}
-test_corpus <- VCorpus(DirSource("./data/samples/testing"), readerControl = list(language = "en_US"))
-test_corpus <- clean_corpus(test_corpus)
-test_corpus <- tm_map(test_corpus, removeWords, curse_words)
+```{r, results="asis"}
+test_corpus <- create_corpus("./data/samples/testing")
 
 two_to_four_ngrams <- function(x) 
   NGramTokenizer(x, Weka_control(min = 2, max = 4))
 
-document_term_matrix <- DocumentTermMatrix(corpus,
+document_term_matrix <- DocumentTermMatrix(test_corpus,
                                            control = list(tokenize = two_to_four_ngrams,
                                                           wordLengths=c(1, Inf)))
 
@@ -1125,9 +1132,9 @@ test_data <- build_processed_ngram_frequencies(create_ngrams_data_frame(as.matri
 sample_n(test_data, 12)
 ```
 
-Here we calculate perplexity for different N-Gram sizes:
+Here I calculate perplexity for different N-Gram sizes:
 
-```{r}
+```{r, results="asis"}
 entropy <- function(model, test_data, ngram_length) {
      probabilities <- mapply(function(word, history) model_probability(model = model, word, history),
                              test_data$word, test_data$history)
@@ -1163,12 +1170,12 @@ save(model, file = "./data/model.rda")
 Now the transition matrix has been serialized and saved as a file named `model.rds`. To load the object into R's environment execute the following command:
 
 ```{r, eval = FALSE}
-read(file = "./data/model.rda")
+load(file = "./data/model.rda")
 ```
 
 This command will load the object named `model` into the R environment.
 
-## Results
+## Report
 
 ### Exploratory Data Analysis
 
@@ -1180,18 +1187,14 @@ We could increase coverage by choosing words more aligned with the vocabulary of
 
 - Improving the data corpus by using text collected from each individual user (essentially each user would start with a standard corpus of text, which would improve as the user types new sentences). Each user would have its own particular corpus of text (or its own model, which would be updated over time). That could raise privacy concerns though, as we would be required to store at least bits of conversations and web browsing behavior. That wouldn't be critical for public services such as blogs and twitter, but could be potentially a problem for news (we would need to keep track of articles the user has clicked on).
 
-- Creating groups of users into different profiles (casual, business, scientific, etc) and respective models. An option would be to give the user the option of choosing an specific profile on the fly according with their current needs or commit to a single one when they sign-up for the service.
+- Creating groups of users into different profiles (casual, business, scientific, etc) and respective models. A good approach would be to give the user the option of choosing a specific profile on the fly according with their current needs or commit to one when they sign-up for the service.
 
 ### Model Design
 
-We are going to store our model as a Markov Chain Transition Matrix.
-
 Our knowledge of the word coverage will allows us to limit the number of N-Grams utilized (we know we can cover 90% of the text with a fraction of the N-Grams).
 
-The model is a transition matrix with size ($\text{Number of History N-Grams} \times \text{Number of Predicted Words}$). This matrix size is the number of parameters we need.
+The model is a Markov Chain transition matrix with size ($\text{Number of History N-Grams} \times \text{Number of Predicted Words}$). The matrix size is the number of parameters we need.
 
-We are going to smooth probabilities using Good-Turing estimation.
+Given that we are estimating the probabilties from a text corpus and some history of words might not exist, resulting in zero probabilities, we are going to smooth probabilities. Specifically, we will use Katz's Back-off and Good-Turing to estimate the probability of unobserved n-grams.
 
-We are going to evaluate our model by calculating perplexity.
-
-We are going to use Katz's Back-off to estimate the probability of unobserved n-grams.
+We will be using perplexity as a matric for evaluating our model's performance.
